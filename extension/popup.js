@@ -83,22 +83,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const clearQueueBtn = document.getElementById('btn-clear-queue');
   if (clearQueueBtn) {
+    const defaultClearHtml = clearQueueBtn.innerHTML;
     clearQueueBtn.addEventListener('click', async () => {
       try {
         clearQueueBtn.disabled = true;
-        clearQueueBtn.innerText = 'Đang dọn...';
+        clearQueueBtn.textContent = 'Đang dọn...';
         chrome.runtime.sendMessage({ action: 'GET_STATUS' }, async (statusRes) => {
-          const sUrl = statusRes?.serverUrl || `http://localhost:${DEFAULT_PORT}`;
-          const res = await fetch(`${sUrl}/queue/clear`, { method: 'POST' });
-          const data = await res.json();
-          alert(data.message || 'Đã dọn sạch hàng đợi!');
-          updateUI();
+          try {
+            const sUrl = statusRes?.serverUrl || `http://localhost:${DEFAULT_PORT}`;
+            const res = await fetch(`${sUrl}/queue/clear`, { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || 'Đã dọn sạch hàng đợi!');
+            updateUI();
+          } catch (err) {
+            alert('Lỗi: ' + err.message);
+          } finally {
+            clearQueueBtn.disabled = false;
+            clearQueueBtn.innerHTML = defaultClearHtml;
+          }
         });
       } catch (err) {
         alert('Lỗi: ' + err.message);
-      } finally {
         clearQueueBtn.disabled = false;
-        clearQueueBtn.innerText = '🗑️ Clear Queue';
+        clearQueueBtn.innerHTML = defaultClearHtml;
       }
     });
   }
@@ -144,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         workerToken: token
       }, (res) => {
         saveServerBtn.disabled = false;
-        saveServerBtn.textContent = '💾 Lưu & Kết Nối';
+        saveServerBtn.textContent = 'Lưu & Kết nối';
         if (res && res.success) {
           if (settingsPanel) settingsPanel.style.display = 'none';
           if (toggleSettingsBtn) toggleSettingsBtn.textContent = 'Sửa';

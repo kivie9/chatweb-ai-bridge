@@ -10,15 +10,17 @@
     }
   });
 
-  // Tránh nạp đè nếu script cũ vẫn còn sống; nếu script cũ đã chết do reload extension thì cho phép nạp mới
-  if (window.__CHATGPT_BRIDGE_LOADED__ && window.__CHATGPT_BRIDGE_IS_ALIVE__ && window.__CHATGPT_BRIDGE_IS_ALIVE__()) {
+  // Tránh nạp đè nếu script cùng version vẫn còn sống; nếu version mới hơn hoặc script cũ chết thì cho phép nạp mới
+  const SCRIPT_VERSION = '2.3.0';
+  if (window.__CHATGPT_BRIDGE_LOADED__ && window.__CHATGPT_BRIDGE_VERSION__ === SCRIPT_VERSION && window.__CHATGPT_BRIDGE_IS_ALIVE__ && window.__CHATGPT_BRIDGE_IS_ALIVE__()) {
     console.log('ℹ️ [ChatGPT Bridge] Content Script đã tồn tại và đang hoạt động, bỏ qua injection trùng lặp.');
     return;
   }
   window.__CHATGPT_BRIDGE_LOADED__ = true;
+  window.__CHATGPT_BRIDGE_VERSION__ = SCRIPT_VERSION;
   window.__CHATGPT_BRIDGE_IS_ALIVE__ = isExtensionValid;
 
-  console.log('🚀 [ChatGPT Bridge v2.0] Content Script nạp thành công trên tab ChatGPT.');
+  console.log('🚀 [ChatGPT Bridge v2.3] Content Script nạp thành công trên tab ChatGPT.');
 
   // Wrapper gửi tin an toàn tuyệt đối, không bao giờ ném Uncaught Error khi extension reload
   const safeSendMessage = UTILS.safeSendMessage || ((message) => {
@@ -50,12 +52,12 @@
     'button:has(rect)'
   ],
   assistantMessage: [
-    '[data-markdown-text-style="assistant-message"]',
-    '[class*="MarkdownRoot"]',
     '[data-chatgpt-search-unit-key*="assistant"]',
     '[data-content-search-unit-key*="assistant"]',
-    '[data-conversation-role="assistant"]',
     '[data-message-author-role="assistant"]',
+    'article[data-turn="assistant"]',
+    '[data-markdown-text-style="assistant-message"]',
+    '[class*="MarkdownRoot"]',
     '.markdown.prose'
   ],
   cloudflare: [
@@ -92,41 +94,131 @@ const queryAllAny = UTILS.queryAllAny || ((selectors, root = document) => {
   return [];
 });
 
-// Bóc tách văn bản bảo toàn cấu trúc Markdown & Code blocks
+// Kiểm tra thẻ <img> có phải ảnh nội dung thực sự (loại bỏ favicon, icon nhỏ <= 36px, phần tử ẩn)
+function resolveLiveImageInfo(liveImg) {
+  if (!liveImg) return { isContent: false };
+  try {
+    if (liveImg.closest('.sr-only') || liveImg.closest('[data-markdown-copy="exclude"]')) {
+      return { isContent: false };
+    }
+    let src = liveImg.currentSrc || liveImg.src || liveImg.getAttribute('src') || '';
+    src = src.trim();
+    if (!src || src.startsWith('chrome-extension://')) {
+      return { isContent: false };
+    }
+    const lowerSrc = src.toLowerCase();
+    if (
+      lowerSrc.includes('google.com/s2/favicons') ||
+      lowerSrc.includes('favicons?domain') ||
+      lowerSrc.includes('favicon.ico') ||
+      lowerSrc.includes('icons.duckduckgo.com/ip3')
+    ) {
+      return { isContent: false };
+    }
+
+    const attrW = parseInt(liveImg.getAttribute('width') || '0', 10);
+    const attrH = parseInt(liveImg.getAttribute('height') || '0', 10);
+    if ((attrW > 0 && attrW <= 36) || (attrH > 0 && attrH <= 36)) {
+      return { isContent: false };
+    }
+
+    const rect = liveImg.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0 && rect.width <= 36 && rect.height <= 36) {
+      return { isContent: false };
+    }
+
+    if (src.startsWith('blob:') && liveImg.complete && liveImg.naturalWidth > 0) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = liveImg.naturalWidth;
+        canvas.height = liveImg.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(liveImg, 0, 0);
+        src = canvas.toDataURL('image/png');
+      } catch (_) {}
+    }
+
+    const alt = (liveImg.getAttribute('alt') || 'Image').replace(/[\r\n\[\]]+/g, ' ').trim() || 'Image';
+    return { isContent: true, src, alt };
+  } catch (_) {
+    return { isContent: false };
+  }
+}
+
+// Bóc tách văn bản bảo toàn cấu trúc Markdown, Code blocks & Hình ảnh phản hồi
 function extractCleanMarkdown(element) {
   if (!element) return '';
-  let md = null;
+  let rootEl = element;
   try {
-    if (element.matches && (element.matches('[data-markdown-text-style="assistant-message"]') || element.matches('[class*="MarkdownRoot"]'))) {
-      md = element;
+    const isTurnRoot = element.matches && (
+      element.matches('[data-chatgpt-search-unit-key*="assistant"]') ||
+      element.matches('[data-content-search-unit-key*="assistant"]') ||
+      element.matches('[data-message-author-role="assistant"]') ||
+      element.matches('article[data-turn="assistant"]')
+    );
+    if (isTurnRoot) {
+      rootEl = element.querySelector('.group[data-chatgpt-selection-message-id]') || element;
+    } else if (element.matches && (element.matches('[data-markdown-text-style="assistant-message"]') || element.matches('[class*="MarkdownRoot"]'))) {
+      rootEl = element;
     } else {
-      md = element.querySelector('[data-markdown-text-style="assistant-message"]') ||
-           element.querySelector('[class*="MarkdownRoot"]') ||
-           element.querySelector('.markdown') ||
-           element;
+      rootEl = element.querySelector('.group[data-chatgpt-selection-message-id]') ||
+               element.querySelector('[data-markdown-text-style="assistant-message"]') ||
+               element.querySelector('[class*="MarkdownRoot"]') ||
+               element.querySelector('.markdown') ||
+               element;
     }
-  } catch (e) {
-    md = element;
+  } catch (_) {
+    rootEl = element;
   }
 
-  if (!md) return '';
+  if (!rootEl) return '';
 
-  // Xử lý các code block giữ nguyên syntax ```
-  const codeBlocks = md.querySelectorAll('pre');
-  if (codeBlocks.length === 0) {
-    return (md.innerText || md.textContent || '').trim();
+  const liveImgs = Array.from(rootEl.querySelectorAll('img'));
+  const codeBlocks = rootEl.querySelectorAll('pre');
+  if (codeBlocks.length === 0 && liveImgs.length === 0) {
+    return (rootEl.innerText || rootEl.textContent || '').trim();
   }
 
-  // Clone để tránh ảnh hưởng DOM thật
-  const clone = md.cloneNode(true);
+  const liveInfos = liveImgs.map(resolveLiveImageInfo);
+
+  // Clone để tránh ảnh hưởng DOM thật và map 1-1 trước khi xóa node rác
+  const clone = rootEl.cloneNode(true);
+  const cloneImgs = Array.from(clone.querySelectorAll('img'));
+  const seenImageUrls = new Set();
+
+  for (let i = 0; i < cloneImgs.length; i++) {
+    const cImg = cloneImgs[i];
+    const info = liveInfos[i];
+    if (info && info.isContent && !seenImageUrls.has(info.src)) {
+      seenImageUrls.add(info.src);
+      let parentBtn = cImg.closest('button');
+      while (parentBtn) {
+        parentBtn.setAttribute('data-bridge-keep', '1');
+        parentBtn = parentBtn.parentElement ? parentBtn.parentElement.closest('button') : null;
+      }
+      cImg.replaceWith(document.createTextNode(`\n![${info.alt}](${info.src})\n`));
+    } else {
+      cImg.remove();
+    }
+  }
+
+  clone.querySelectorAll('.sr-only, h4[data-conversation-role="assistant"], [data-markdown-copy="exclude"]').forEach(n => {
+    try { n.remove(); } catch (_) {}
+  });
+  clone.querySelectorAll('button').forEach(btn => {
+    if (!btn.hasAttribute('data-bridge-keep')) {
+      try { btn.remove(); } catch (_) {}
+    }
+  });
+
   clone.querySelectorAll('pre').forEach(pre => {
     const codeEl = pre.querySelector('code');
     const lang = codeEl ? (codeEl.className.match(/language-(\w+)/) || [])[1] || '' : '';
     const codeText = codeEl ? codeEl.innerText : pre.innerText;
-    pre.innerText = `\n\`\`\`${lang}\n${codeText.trim()}\n\`\`\`\n`;
+    pre.replaceWith(document.createTextNode(`\n\`\`\`${lang}\n${codeText.trim()}\n\`\`\`\n`));
   });
 
-  return (clone.innerText || clone.textContent || '').trim();
+  return (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // Kiểm tra lỗi hệ thống hoặc Cloudflare chặn
@@ -368,8 +460,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Phản hồi nhịp tim kiểm tra tab sống & đồng bộ tài khoản
   if (request.action === 'PING' || request.action === 'CHECK_ACCOUNT') {
     reportChatGPTAccount().catch(() => {});
-    sendResponse({ action: 'PONG', version: '2.1' });
+    sendResponse({ action: 'PONG', version: SCRIPT_VERSION });
     return false;
+  }
+
+  if (request.action === 'GET_WEB_MODELS') {
+    detectChatGPTWebModels({ openMenu: Boolean(request.openMenu) })
+      .then((result) => {
+        safeSendMessage({ action: 'UPDATE_WEB_MODELS', provider: 'chatgpt', data: result });
+        try { sendResponse(result); } catch (_) {}
+      })
+      .catch((err) => {
+        try { sendResponse({ provider: 'chatgpt', currentModel: null, models: [], error: err.message }); } catch (_) {}
+      });
+    return true;
   }
 
   // Nhận lệnh hủy tác vụ từ server/background
@@ -927,12 +1031,154 @@ function injectFloatingBridgeButton() {
     } catch (e) {}
   }
 
+  // Quét danh sách Model thực tế từ ChatGPT Web (/backend-api/models + DOM Model Switcher)
+  async function detectChatGPTWebModels({ openMenu = false } = {}) {
+    const models = [];
+    const seen = new Set();
+    let currentModel = null;
+
+    const addModel = (entry) => {
+      if (!entry || !entry.id) return;
+      const key = String(entry.id).toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      models.push(entry);
+    };
+
+    // 1. Đọc model / chế độ đang active từ DOM Switcher
+    const headerTrigger = document.querySelector('[data-testid="model-switcher-dropdown-button"], button[aria-label*="Model selector" i]');
+    const composerTrigger = document.querySelector('button[aria-label="Select ChatGPT model"]');
+
+    const readTriggerLabel = (btn) => {
+      if (!btn) return null;
+      const labelEl = btn.querySelector('.ModelPickerTriggerLabel-xR9gDc, [class*="ModelPickerTriggerLabel"], .truncate');
+      const raw = (labelEl ? labelEl.textContent : (btn.innerText || btn.textContent || '')).trim();
+      const firstLine = raw.split('\n').map(s => s.trim()).filter(Boolean)[0] || null;
+      return firstLine;
+    };
+
+    const headerLabel = readTriggerLabel(headerTrigger);
+    const composerLabel = readTriggerLabel(composerTrigger);
+    currentModel = [headerLabel, composerLabel].filter(Boolean).join(' · ') || null;
+
+    // 2. Gọi Internal Models API của phiên đăng nhập (/backend-api/models)
+    try {
+      const sessionRes = await fetch('/api/auth/session', {
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+      });
+      if (sessionRes.ok) {
+        const sessionData = await sessionRes.json();
+        const accessToken = sessionData?.accessToken;
+        const headers = { 'Accept': 'application/json' };
+        if (accessToken) {
+          headers['Authorization'] = `Bearer ${accessToken}`;
+        }
+        const modelsRes = await fetch('/backend-api/models', {
+          headers,
+          credentials: 'same-origin'
+        });
+        if (modelsRes.ok) {
+          const modelsJson = await modelsRes.json();
+          const apiList = Array.isArray(modelsJson?.models) ? modelsJson.models : [];
+          for (const m of apiList) {
+            if (!m || !m.slug) continue;
+            const isCurrent = Boolean(
+              currentModel &&
+              (currentModel.toLowerCase().includes(String(m.slug).toLowerCase()) ||
+               (m.title && currentModel.toLowerCase().includes(String(m.title).toLowerCase())))
+            );
+            addModel({
+              id: String(m.slug),
+              name: m.title || String(m.slug),
+              description: m.description || '',
+              maxTokens: m.max_tokens || null,
+              active: isCurrent,
+              source: 'web-api'
+            });
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Nếu openMenu === true, quét thêm menu switcher trên UI để lấy đủ chế độ (Instant, Thinking, Pro...)
+    if (openMenu && !isExecuting) {
+      const triggersToOpen = [headerTrigger, composerTrigger].filter(Boolean);
+      for (const trigger of triggersToOpen) {
+        try {
+          trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+          trigger.click();
+          await sleep(350);
+
+          const menuItems = document.querySelectorAll('[role="menuitem"], [role="menuitemradio"], [data-testid^="model-switcher-"]');
+          for (const item of menuItems) {
+            const lines = (item.innerText || item.textContent || '')
+              .split('\n')
+              .map(s => s.trim())
+              .filter(Boolean);
+            const title = lines[0];
+            if (!title || title.length > 60) continue;
+            const testId = item.getAttribute('data-testid') || '';
+            const slug = testId.startsWith('model-switcher-')
+              ? testId.replace(/^model-switcher-/, '')
+              : title.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-|-$/g, '');
+            if (!slug) continue;
+
+            const isChecked = item.getAttribute('aria-checked') === 'true' ||
+                              Boolean(item.querySelector('svg[data-icon="check"], [data-state="checked"]')) ||
+                              Boolean(currentModel && currentModel.toLowerCase().includes(title.toLowerCase()));
+
+            addModel({
+              id: slug,
+              name: title,
+              description: lines.slice(1).join(' — '),
+              active: isChecked,
+              source: 'web-dom'
+            });
+          }
+        } catch (_) {} finally {
+          try {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+            await sleep(150);
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (models.length === 0 && currentModel) {
+      addModel({
+        id: currentModel.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-|-$/g, '') || 'chatgpt',
+        name: currentModel,
+        description: 'Active model on tab',
+        active: true,
+        source: 'web-trigger'
+      });
+    }
+
+    return {
+      provider: 'chatgpt',
+      currentModel,
+      models,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function reportChatGPTWebModels() {
+    detectChatGPTWebModels({ openMenu: false }).then((res) => {
+      if (res && (res.currentModel || res.models.length > 0)) {
+        safeSendMessage({ action: 'UPDATE_WEB_MODELS', provider: 'chatgpt', data: res });
+      }
+    }).catch(() => {});
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       injectFloatingBridgeButton();
       setTimeout(reportChatGPTAccount, 800);
       setTimeout(reportChatGPTAccount, 2500);
       setTimeout(reportChatGPTAccount, 6000);
+      setTimeout(reportChatGPTWebModels, 1500);
+      setTimeout(reportChatGPTWebModels, 4500);
       startAccountObserver();
     });
   } else {
@@ -940,6 +1186,8 @@ function injectFloatingBridgeButton() {
     setTimeout(reportChatGPTAccount, 800);
     setTimeout(reportChatGPTAccount, 2500);
     setTimeout(reportChatGPTAccount, 6000);
+    setTimeout(reportChatGPTWebModels, 1500);
+    setTimeout(reportChatGPTWebModels, 4500);
     startAccountObserver();
   }
 })();

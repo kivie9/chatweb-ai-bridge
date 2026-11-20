@@ -65,13 +65,20 @@ function setupWebSocket(server) {
           }
           const accounts = data.accounts || {};
           const tabCounts = data.tabCounts || null;
-          taskQueue.registerWorker(workerId, ws, { name: workerName, providers, accounts, tabCounts });
-          console.log(`🏷️ [WebSocket Hub] Cập nhật Worker: "${workerName}" (${workerId}) | Hỗ trợ: [${providers.join(', ')}] | Tabs: ${JSON.stringify(tabCounts || {})}`);
+          const webModels = data.webModels || null;
+          taskQueue.registerWorker(workerId, ws, { name: registeredName, providers, accounts, tabCounts, webModels });
+          console.log(`🏷️ [WebSocket Hub] Cập nhật Worker: "${registeredName}" (${workerId}) | Hỗ trợ: [${providers.join(', ')}] | Tabs: ${JSON.stringify(tabCounts || {})}`);
           return;
         }
 
         // 2. Nhịp tim giữ kết nối
         if (data.action === 'HEARTBEAT') {
+          return;
+        }
+
+        // 3. Kết quả quét danh sách Model thực tế từ giao diện web
+        if (data.action === 'WEB_MODELS_RESULT') {
+          taskQueue.handleWebModelsResult(data, workerId);
           return;
         }
 

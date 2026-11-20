@@ -16,9 +16,32 @@ async function runComprehensiveVerification() {
   });
   console.log('✅ WebSocket Bridge kết nối thành công!');
 
-  // Giả lập Extension xử lý ASK & Streaming
+  // Giả lập Extension xử lý ASK, Streaming & FETCH_WEB_MODELS
   ws.on('message', (raw) => {
     const data = JSON.parse(raw.toString());
+
+    if (data.action === 'FETCH_WEB_MODELS') {
+      ws.send(JSON.stringify({
+        action: 'WEB_MODELS_RESULT',
+        id: data.id,
+        webModels: {
+          chatgpt: {
+            currentModel: 'GPT-4o',
+            models: [{ id: 'gpt-4o', name: 'GPT-4o', description: 'Live ChatGPT model', active: true }],
+            updatedAt: new Date().toISOString()
+          },
+          gemini: {
+            currentModel: '2.5 Flash',
+            models: [
+              { id: 'gemini-2.5-flash', name: '2.5 Flash', description: 'Fast model', active: true },
+              { id: 'gemini-2.5-pro', name: '2.5 Pro', description: 'Reasoning model', active: false }
+            ],
+            updatedAt: new Date().toISOString()
+          }
+        }
+      }));
+      return;
+    }
 
     if (data.action === 'ASK') {
       console.log(`🤖 [Mock Extension] Nhận task ${data.id}: "${data.prompt.slice(0, 30)}..." (stream: ${data.stream})`);
@@ -196,7 +219,45 @@ async function runComprehensiveVerification() {
   }
   console.log('✅ Tính năng Multimodal Vision (gửi ảnh kèm prompt) hoạt động 100% hoàn hảo!');
 
-  console.log('\n🎉 TOÀN BỘ 8 BÀI TEST KIẾN TRÚC & VISION ĐÃ ĐẠT 100%!');
+  // Test 9: Kiểm tra Trang Lịch Sử Prompt (/history & /api/history)
+  console.log('\n--- TEST 9: KIỂM TRA TRANG & API LỊCH SỬ PROMPT ---');
+  const historyPageRes = await fetch('http://localhost:9998/history');
+  const historyPageHtml = await historyPageRes.text();
+  if (historyPageRes.status !== 200 || !historyPageHtml.includes('pageHistoryView')) {
+    throw new Error('Test 9 Thất bại: Route /history không trả về giao diện lịch sử prompt!');
+  }
+
+  const historyApiRes = await fetch('http://localhost:9998/api/history');
+  const historyApiData = await historyApiRes.json();
+  console.log(`📜 History API: total=${historyApiData.total}, summary=`, historyApiData.summary);
+  if (historyApiData.status !== 'ok' || !Array.isArray(historyApiData.items) || historyApiData.items.length < 7) {
+    throw new Error('Test 9 Thất bại: /api/history chưa ghi nhận đủ các prompt đã chạy!');
+  }
+
+  const hasVisionRecord = historyApiData.items.some(item => item.hasImages && item.status === 'completed');
+  const hasFailedRecord = historyApiData.items.some(item => item.status === 'failed' && item.error?.includes('Sorry, something went wrong'));
+  if (!hasVisionRecord || !hasFailedRecord) {
+    throw new Error('Test 9 Thất bại: Thiếu bản ghi Vision hoặc Failed trong lịch sử prompt!');
+  }
+  console.log('✅ Trang /history và API /api/history hoạt động chính xác 100%!');
+
+  // Test 10: Kiểm tra Quét Danh Sách Model Thực Tế Từ Web (/api/web-models & /v1/models?refresh=true)
+  console.log('\n--- TEST 10: KIỂM TRA QUÉT DANH SÁCH MODEL TỪ WEB ---');
+  const webModelsRes = await fetch('http://localhost:9998/api/web-models?refresh=true');
+  const webModelsData = await webModelsRes.json();
+  console.log('🌐 Web Models:', webModelsData.models.map(m => `${m.provider}:${m.id}(active=${m.active})`));
+  if (webModelsData.status !== 'ok' || !webModelsData.models.some(m => m.id === 'gemini-2.5-flash')) {
+    throw new Error('Test 10 Thất bại: /api/web-models?refresh=true không trả về model quét từ Web!');
+  }
+
+  const liveOpenAiModelsRes = await fetch('http://localhost:9998/v1/models?refresh=true');
+  const liveOpenAiModelsData = await liveOpenAiModelsRes.json();
+  if (!liveOpenAiModelsData.data.some(m => m.id === 'gemini-2.5-pro' && m.source === 'web-live')) {
+    throw new Error('Test 10 Thất bại: /v1/models không hợp nhất model web-live!');
+  }
+  console.log('✅ API quét model thực tế từ Web (/api/web-models & /v1/models) hoạt động 100%!');
+
+  console.log('\n🎉 TOÀN BỘ 10 BÀI TEST KIẾN TRÚC, VISION, HISTORY & WEB MODELS ĐÃ ĐẠT 100%!');
   ws.close();
   process.exit(0);
 }

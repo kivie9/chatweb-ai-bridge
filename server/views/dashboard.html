@@ -2,305 +2,1062 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>ChatGPT & Gemini Bridge - Multi-Account Dashboard</title>
+  <title>AI Web Bridge — Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #070a12;
-      --card-bg: rgba(18, 25, 42, 0.75);
-      --card-hover: rgba(26, 36, 61, 0.85);
-      --border: rgba(56, 189, 248, 0.12);
-      --border-strong: rgba(56, 189, 248, 0.28);
-      --primary: #38bdf8;
-      --accent: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --purple: #a855f7;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
+      --bg: #09090b;
+      --surface: #111113;
+      --surface-elevated: #16161a;
+      --surface-input: #0c0c0e;
+      --surface-hover: #1a1a1f;
+      --border: #222226;
+      --border-strong: #323238;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --accent-primary: #fafafa;
+      --accent-primary-hover: #e4e4e7;
+      --accent-primary-text: #09090b;
+      --emerald: #10b981;
+      --emerald-soft: rgba(16, 185, 129, 0.12);
+      --emerald-border: rgba(16, 185, 129, 0.25);
+      --amber: #f59e0b;
+      --amber-soft: rgba(245, 158, 11, 0.12);
+      --amber-border: rgba(245, 158, 11, 0.25);
+      --red: #ef4444;
+      --red-soft: rgba(239, 68, 68, 0.1);
+      --red-border: rgba(239, 68, 68, 0.25);
+      --blue: #60a5fa;
+      --blue-soft: rgba(96, 165, 250, 0.1);
+      --blue-border: rgba(96, 165, 250, 0.25);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --radius-lg: 10px;
+      --radius-md: 8px;
+      --radius-sm: 6px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background: var(--bg);
+      font-family: var(--font-sans);
+      background-color: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 32px 24px;
-      background-image: radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 45%),
-                        radial-gradient(circle at 88% 85%, rgba(16, 185, 129, 0.08) 0%, transparent 45%);
+      padding: 24px 24px 48px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
-    .container { max-width: 1180px; margin: 0 auto; }
-    header {
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 28px;
-      padding-bottom: 20px;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
       border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
       gap: 16px;
     }
-    .title-group h1 {
-      font-size: 24px;
-      font-weight: 800;
-      color: #fff;
+
+    .brand {
       display: flex;
       align-items: center;
       gap: 12px;
-      letter-spacing: -0.5px;
     }
-    .title-group p {
-      font-size: 13px;
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-md);
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-strong);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text);
+      flex-shrink: 0;
+    }
+
+    .brand-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title-row h1 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .version-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      padding: 1px 7px;
+      border-radius: 9999px;
+    }
+
+    .brand-sub {
+      font-size: 12.5px;
       color: var(--text-muted);
-      margin-top: 4px;
+      margin-top: 1px;
     }
+
+    /* Top-level Page Navigation */
+    .page-nav {
+      display: inline-flex;
+      background: var(--surface);
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      gap: 3px;
+    }
+
+    .nav-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 6px 13px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: color 0.15s ease, background-color 0.15s ease;
+      text-decoration: none;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .nav-tab.active {
+      background: var(--surface-elevated);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+
+    .nav-counter {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-variant-numeric: tabular-nums;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: var(--surface-input);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Badges & Status Pills */
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
     }
+
     .badge-online {
-      background: rgba(16, 185, 129, 0.15);
-      color: var(--accent);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+      background: var(--emerald-soft);
+      color: #34d399;
+      border-color: var(--emerald-border);
     }
+
     .badge-offline {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--danger);
-      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: var(--red-soft);
+      color: #f87171;
+      border-color: var(--red-border);
     }
+
     .badge-dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
       background: currentColor;
-      box-shadow: 0 0 8px currentColor;
+      flex-shrink: 0;
     }
-    .tag {
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-family: 'JetBrains Mono', monospace;
-    }
-    .tag-chatgpt { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
-    .tag-gemini { background: rgba(56, 189, 248, 0.15); color: #60a5fa; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .tag-worker { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-    .tag-idle { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
-    .tag-busy { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
 
-    .grid {
+    .badge-online .badge-dot {
+      animation: statusPulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes statusPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Telemetry Strip */
+    .telemetry-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .card {
-      background: var(--card-bg);
+      grid-template-columns: repeat(6, 1fr);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px 20px;
-      backdrop-filter: blur(12px);
-      transition: all 0.2s ease;
-    }
-    .card:hover {
-      border-color: var(--border-strong);
-      transform: translateY(-2px);
-    }
-    .card h3 {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    .card .val {
-      font-size: 26px;
-      font-weight: 800;
-      font-family: 'JetBrains Mono', monospace;
-      color: #fff;
-    }
-    .card .sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 4px;
+      border-radius: var(--radius-lg);
+      margin-bottom: 20px;
+      overflow: hidden;
     }
 
-    .panel {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 24px;
-      backdrop-filter: blur(12px);
+    .telemetry-grid-4 {
+      grid-template-columns: repeat(4, 1fr);
     }
+
+    @media (max-width: 1024px) {
+      .telemetry-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .telemetry-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .telemetry-grid,
+      .telemetry-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .metric-cell {
+      padding: 15px 18px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: background-color 0.15s ease;
+    }
+
+    .metric-cell:hover {
+      background-color: var(--surface-hover);
+    }
+
+    @media (min-width: 1025px) {
+      .metric-cell {
+        border-bottom: none;
+      }
+      .metric-cell:last-child {
+        border-right: none;
+      }
+    }
+
+    .metric-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    .metric-sub {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 20px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
     .panel-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border);
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
     }
-    .panel h2 {
-      font-size: 16px;
-      font-weight: 700;
+
+    .panel-title-wrap {
       display: flex;
       align-items: center;
-      gap: 8px;
-      color: #fff;
+      gap: 10px;
     }
+
+    .panel-icon {
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .panel h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
     .panel-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
+    .panel-body {
+      padding: 20px;
+    }
+
+    /* Segmented View Switcher */
     .view-switcher {
       display: inline-flex;
-      background: rgba(15, 23, 42, 0.6);
+      background: var(--surface-input);
       padding: 3px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      gap: 4px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      gap: 2px;
     }
+
     .tab-btn {
       background: transparent;
       color: var(--text-muted);
       border: none;
       padding: 5px 12px;
-      border-radius: 6px;
+      border-radius: 5px;
+      font-family: var(--font-sans);
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: color 0.15s ease, background-color 0.15s ease;
     }
+
+    .tab-btn:hover {
+      color: var(--text-secondary);
+    }
+
     .tab-btn.active {
-      background: rgba(56, 189, 248, 0.2);
-      color: var(--primary);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      background: var(--surface-elevated);
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border-strong);
+    }
+
+    /* Tags & Status Pills */
+    .tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text-secondary);
+    }
+
+    .tag-chatgpt {
+      background: var(--emerald-soft);
+      color: #34d399;
+      border-color: var(--emerald-border);
+    }
+
+    .tag-gemini {
+      background: var(--blue-soft);
+      color: var(--blue);
+      border-color: var(--blue-border);
+    }
+
+    .tag-worker {
+      background: var(--surface-elevated);
+      color: var(--text-secondary);
+      border-color: var(--border-strong);
+    }
+
+    .tag-vision {
+      background: var(--amber-soft);
+      color: #fbbf24;
+      border-color: var(--amber-border);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      background: var(--surface-elevated);
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-ready {
+      background: var(--emerald-soft);
+      border-color: var(--emerald-border);
+      color: #34d399;
+    }
+    .status-ready .status-dot { background: var(--emerald); }
+
+    .status-busy {
+      background: var(--amber-soft);
+      border-color: var(--amber-border);
+      color: #fbbf24;
+    }
+    .status-busy .status-dot {
+      background: var(--amber);
+      animation: statusPulse 1.2s ease-in-out infinite;
+    }
+
+    .status-closed {
+      background: var(--red-soft);
+      border-color: var(--red-border);
+      color: #f87171;
+    }
+    .status-closed .status-dot { background: var(--red); }
+
+    .status-offline {
+      background: var(--surface-elevated);
+      border-color: var(--border);
+      color: var(--text-muted);
+    }
+    .status-offline .status-dot { background: var(--text-muted); }
+
+    /* Provider Monogram */
+    .provider-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      flex-shrink: 0;
+      border: 1px solid var(--border-strong);
+      background: var(--surface-elevated);
+      color: var(--text-secondary);
+    }
+
+    .provider-avatar.gpt {
+      color: #34d399;
+      border-color: var(--emerald-border);
+      background: var(--emerald-soft);
+    }
+
+    .provider-avatar.gmn {
+      color: var(--blue);
+      border-color: var(--blue-border);
+      background: var(--blue-soft);
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
     }
 
     table {
       width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
+      border-collapse: collapse;
       font-size: 13px;
     }
+
     th {
       text-align: left;
-      padding: 12px 14px;
-      font-weight: 600;
+      padding: 10px 16px;
+      font-weight: 500;
       color: var(--text-muted);
       font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(15, 23, 42, 0.4);
-    }
-    th:first-child { border-top-left-radius: 8px; }
-    th:last-child { border-top-right-radius: 8px; }
-    td {
-      padding: 12px 14px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: #cbd5e1;
-      vertical-align: middle;
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255, 255, 255, 0.02); }
-    .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
-
-    .input-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 14px;
-      flex-wrap: wrap;
-    }
-    select.input-field { max-width: 170px; }
-    .input-field {
-      flex: 1;
-      min-width: 160px;
-      background: #0b1120;
-      border: 1px solid #27354f;
-      color: #fff;
-      padding: 11px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    .input-field:focus { border-color: var(--primary); }
-    .btn {
-      background: var(--primary);
-      color: #070a12;
-      border: none;
-      padding: 11px 20px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.2s;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-input);
       white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
+      vertical-align: middle;
+      font-variant-numeric: tabular-nums;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover td {
+      background: var(--surface-hover);
+    }
+
+    tbody tr.clickable-row {
+      cursor: pointer;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty-placeholder {
+      text-align: center;
+      padding: 32px 16px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Buttons */
+    .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      white-space: nowrap;
     }
-    .btn:hover { background: #7dd3fc; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent-primary);
+      color: var(--accent-primary-text);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-primary-hover);
+    }
+
+    .btn-secondary {
+      background: var(--surface-elevated);
+      color: var(--text);
+      border-color: var(--border-strong);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #202026;
+      border-color: #42424a;
+    }
+
     .btn-danger {
-      background: rgba(239, 68, 68, 0.15);
+      background: var(--red-soft);
       color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.35);
-      padding: 6px 12px;
+      border-color: var(--red-border);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 11.5px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Inputs & Filter Bars */
+    .composer-row,
+    .filter-toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .composer-row {
+      margin-bottom: 12px;
+    }
+
+    .filter-toolbar {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-elevated);
+    }
+
+    .search-input-wrap {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .input-field {
+      flex: 1;
+      min-width: 150px;
+      background: var(--surface-input);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .search-input-wrap .input-field {
+      width: 100%;
+      padding-left: 34px;
+    }
+
+    .input-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    .input-field:focus {
+      border-color: #71717a;
+    }
+
+    select.input-field {
+      max-width: 170px;
+      flex: 0 0 170px;
+      cursor: pointer;
+    }
+
+    .input-session {
+      max-width: 220px;
+      flex: 0 0 220px;
+      font-family: var(--font-mono);
       font-size: 12px;
     }
-    .btn-danger:hover { background: #ef4444; color: #fff; }
-    .btn-sm { padding: 4px 8px; font-size: 11px; }
 
-    pre {
-      background: #050811;
-      border: 1px solid #1e293b;
-      padding: 16px;
-      border-radius: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      color: #cbd5e1;
-      max-height: 280px;
+    .vision-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    kbd {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* Image Attachment Preview */
+    .image-preview-card {
+      display: none;
+      margin-bottom: 14px;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .image-preview-thumb {
+      max-height: 64px;
+      max-width: 96px;
+      border-radius: var(--radius-sm);
+      object-fit: contain;
+      background: #000;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    /* Output Terminal */
+    .output-shell {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-input);
+      overflow: hidden;
+    }
+
+    .output-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+
+    .output-meta {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    pre#outputBox {
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #e4e4e7;
+      max-height: 320px;
+      min-height: 110px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .empty-placeholder {
-      text-align: center;
-      padding: 24px;
+
+    pre#outputBox::-webkit-scrollbar,
+    .table-wrap::-webkit-scrollbar,
+    .inspector-pre::-webkit-scrollbar,
+    .inspector-body::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    pre#outputBox::-webkit-scrollbar-thumb,
+    .table-wrap::-webkit-scrollbar-thumb,
+    .inspector-pre::-webkit-scrollbar-thumb,
+    .inspector-body::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 3px;
+    }
+
+    .panel-dragover {
+      border-color: #71717a;
+      background-color: #141418;
+    }
+
+    /* History Table Preview Snippets */
+    .text-snippet {
+      max-width: 310px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 12.5px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .text-snippet-muted {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .text-snippet-err {
+      color: #fca5a5;
+      font-size: 12px;
+    }
+
+    .tag-list-inline {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 5px;
+    }
+
+    /* Request Detail Inspector Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .inspector-dialog {
+      width: 100%;
+      max-width: 820px;
+      max-height: 88vh;
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-elevated);
+      gap: 12px;
+    }
+
+    .inspector-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .inspector-title-group h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .inspector-body {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .meta-box {
+      background: var(--surface-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 12px;
+    }
+
+    .meta-box-label {
+      font-size: 10.5px;
       color: var(--text-muted);
-      font-style: italic;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 3px;
+    }
+
+    .meta-box-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .inspector-section {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-input);
+      overflow: hidden;
+    }
+
+    .inspector-section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 14px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+
+    .inspector-section-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+    }
+
+    .inspector-pre {
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #e4e4e7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .inspector-pre.error-text {
+      color: #fca5a5;
+    }
+
+    .response-images-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .response-img-card {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: var(--surface-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      text-decoration: none;
+      color: var(--text-secondary);
+      transition: border-color 0.15s ease;
+    }
+
+    .response-img-card:hover {
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    .response-img-card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: #000;
+    }
+
+    .response-img-caption {
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
-      <div class="title-group">
-        <h1>🚀 ChatGPT & Gemini Multi-Account Bridge</h1>
-        <p>Quản lý tập trung theo Tài Khoản Đăng Nhập, điều phối cụm trình duyệt & vị trí Session</p>
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+            <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+            <path d="M10 6.5h3a2 2 0 0 1 2 2V14"></path>
+            <path d="M6.5 10v5.5a2 2 0 0 0 2 2H14"></path>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title-row">
+            <h1>AI Web Bridge</h1>
+            <span class="version-pill">v2.1</span>
+          </div>
+          <p class="brand-sub">Cầu nối điều phối ChatGPT &amp; Google Gemini qua WebSocket Worker Pool</p>
+        </div>
       </div>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <button id="clearQueueBtn" class="btn btn-danger">🗑️ Clear Queue</button>
+
+      <nav class="page-nav" aria-label="Điều hướng trang">
+        <button type="button" id="navTabOverview" class="nav-tab active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+            <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+            <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+          </svg>
+          <span>Tổng quan</span>
+        </button>
+        <button type="button" id="navTabHistory" class="nav-tab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <polyline points="12 7 12 12 15.5 14"></polyline>
+          </svg>
+          <span>Lịch sử Prompt</span>
+          <span class="nav-counter" id="navHistoryCount">0</span>
+        </button>
+      </nav>
+
+      <div class="topbar-actions">
+        <button id="clearQueueBtn" class="btn btn-danger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Dọn hàng đợi</span>
+        </button>
         <div id="status-badge" class="badge badge-offline">
           <span class="badge-dot"></span>
           <span id="status-text">Đang kiểm tra...</span>
@@ -308,169 +1065,449 @@
       </div>
     </header>
 
-    <div class="grid">
-      <div class="card">
-        <h3>ACCOUNTS ONLINE</h3>
-        <div class="val" id="metric-accounts" style="color:var(--accent);">0</div>
-        <div class="sub">Tài khoản AI đang sẵn sàng</div>
-      </div>
-      <div class="card">
-        <h3>BROWSERS ONLINE</h3>
-        <div class="val" id="metric-workers" style="color:var(--primary);">0</div>
-        <div class="sub">Trình duyệt kết nối</div>
-      </div>
-      <div class="card">
-        <h3>QUEUE PENDING</h3>
-        <div class="val" id="metric-queue">0</div>
-        <div class="sub">Hàng đợi chờ xử lý</div>
-      </div>
-      <div class="card">
-        <h3>ACTIVE SESSIONS</h3>
-        <div class="val" id="metric-sessions">0</div>
-        <div class="sub">Phiên hội thoại quản lý</div>
-      </div>
-      <div class="card">
-        <h3>TOTAL COMPLETED</h3>
-        <div class="val" id="metric-completed">0</div>
-        <div class="sub">Tác vụ hoàn tất</div>
-      </div>
-      <div class="card">
-        <h3>AVG LATENCY</h3>
-        <div class="val" id="metric-latency">0s</div>
-        <div class="sub">Thời gian sinh phản hồi</div>
-      </div>
-    </div>
+    <!-- VIEW 1: OVERVIEW -->
+    <main id="pageOverviewView">
+      <!-- Telemetry Strip -->
+      <section class="telemetry-grid" aria-label="Thông số hệ thống">
+        <div class="metric-cell">
+          <span class="metric-label">Tài khoản Online</span>
+          <div class="metric-value" id="metric-accounts">0</div>
+          <span class="metric-sub">Tab AI sẵn sàng</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Trình duyệt</span>
+          <div class="metric-value" id="metric-workers">0</div>
+          <span class="metric-sub">Worker đang kết nối</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Hàng đợi</span>
+          <div class="metric-value" id="metric-queue">0</div>
+          <span class="metric-sub">Tác vụ đang chờ</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Active Sessions</span>
+          <div class="metric-value" id="metric-sessions">0</div>
+          <span class="metric-sub">Phiên đang quản lý</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Hoàn tất</span>
+          <div class="metric-value" id="metric-completed">0</div>
+          <span class="metric-sub">Tổng lượt xử lý</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Độ trễ TB</span>
+          <div class="metric-value" id="metric-latency">0.0s</div>
+          <span class="metric-sub">Thời gian phản hồi</span>
+        </div>
+      </section>
 
-    <!-- PANEL 1: DANH SÁCH TÀI KHOẢN ĐĂNG NHẬP / WORKER POOL -->
-    <div class="panel">
-      <div class="panel-header">
-        <h2 id="poolTableTitle">👤 Danh Sách Tài Khoản Đăng Nhập (Accounts Pool)</h2>
-        <div class="panel-actions">
-          <div class="view-switcher">
-            <button id="btnViewAccounts" class="tab-btn active">👤 Xem Theo Tài Khoản</button>
-            <button id="btnViewBrowsers" class="tab-btn">🌐 Xem Theo Trình Duyệt</button>
+      <!-- Panel 1: Accounts & Browser Worker Pool -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </span>
+            <h2 id="poolTableTitle">Tài khoản kết nối</h2>
           </div>
-          <span class="tag tag-worker" id="pool-count-badge">0 Accounts Active</span>
-        </div>
-      </div>
 
-      <!-- VIEW 1: BẢNG TÀI KHOẢN ĐĂNG NHẬP (MẶC ĐỊNH) -->
-      <div id="viewAccountsContainer" style="overflow-x:auto;">
-        <table id="accountsTable">
-          <thead>
-            <tr>
-              <th>Tài Khoản AI (Tên / Email)</th>
-              <th>Nền Tảng</th>
-              <th>Trình Duyệt & OS Host</th>
-              <th>Trạng Thái Hoạt Động</th>
-              <th>Đã Xử Lý</th>
-              <th>Thời Gian Online</th>
-            </tr>
-          </thead>
-          <tbody id="accountsBody">
-            <tr><td colspan="6" class="empty-placeholder">Chưa có tài khoản nào kết nối qua Extension...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- VIEW 2: BẢNG CỤM TRÌNH DUYỆT WORKER POOL -->
-      <div id="viewBrowsersContainer" style="overflow-x:auto; display:none;">
-        <table id="workersTable">
-          <thead>
-            <tr>
-              <th>Tên Trình Duyệt / Worker</th>
-              <th>Tài Khoản Đăng Nhập (Accounts)</th>
-              <th>Worker ID</th>
-              <th>Trạng Thái Hoạt Động</th>
-              <th>Nền Tảng Hỗ Trợ</th>
-              <th>Đã Hoàn Tất</th>
-              <th>Thời Gian Chạy</th>
-            </tr>
-          </thead>
-          <tbody id="workersBody">
-            <tr><td colspan="7" class="empty-placeholder">Chưa có trình duyệt nào kết nối qua Extension WebSocket...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PANEL 2: VỊ TRÍ VÀ THỐNG KÊ SESSION -->
-    <div class="panel">
-      <div class="panel-header">
-        <h2>📍 Bản Đồ Phân Bổ Session & Vị Trí Tài Khoản (Session Location)</h2>
-        <div class="panel-actions">
-          <button id="clearSessionsBtn" class="btn btn-danger btn-sm">🗑️ Xóa Tất Cả Sessions</button>
-        </div>
-      </div>
-      <div style="overflow-x:auto;">
-        <table id="sessionsTable">
-          <thead>
-            <tr>
-              <th>Session ID</th>
-              <th>Provider</th>
-              <th>Tài Khoản Đang Phục Vụ (Account)</th>
-              <th>Trình Duyệt Quản Lý (Browser Host)</th>
-              <th>Lượt Hỏi (Turn)</th>
-              <th>Ước Tính Tokens</th>
-              <th>Hoạt Động Cuối</th>
-              <th>Thao Tác</th>
-            </tr>
-          </thead>
-          <tbody id="sessionsBody">
-            <tr><td colspan="8" class="empty-placeholder">Chưa có session nào được tạo trong phiên này...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PANEL 3: KIỂM THỬ TRỰC TIẾP & MULTIMODAL VISION -->
-    <div class="panel" id="liveTestPanel" style="transition: border-color 0.2s, background-color 0.2s; position:relative;">
-      <div class="panel-header">
-        <h2>⚡ Trực Tiếp Kiểm Thử (Live Prompt Test & Multimodal Vision)</h2>
-        <span id="visionReadyBadge" style="display:none; font-size:12px; background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(16,185,129,0.4); border-radius:12px; padding:3px 10px; font-weight:600;">
-          🖼️ Ảnh đã sẵn sàng gửi (Vision)
-        </span>
-      </div>
-
-      <div class="input-row">
-        <select id="providerSelect" class="input-field">
-          <option value="chatgpt">ChatGPT Web</option>
-          <option value="gemini" selected>Google Gemini</option>
-        </select>
-        <input type="text" id="sessionIdInput" class="input-field" placeholder="Session ID (Để trống = Tạo ngẫu nhiên)" style="max-width:240px;">
-        <input type="text" id="promptInput" class="input-field" placeholder="Nhập câu hỏi hoặc dán ảnh (Ctrl+V) trực tiếp..." value="Hãy phân tích bức ảnh này giúp tôi">
-        <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
-        <button type="button" id="uploadImageBtn" class="btn" style="background:#1e293b; color:#38bdf8; border:1px solid #334155;">🖼️ Đính Kèm Ảnh</button>
-        <button id="sendBtn" class="btn">🚀 Gửi (Stream SSE)</button>
-      </div>
-
-      <!-- Helper hướng dẫn thao tác Vision -->
-      <div style="font-size:12px; color:var(--text-muted); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-        <span>💡 <b>Hỗ trợ Vision:</b> Nhấn <kbd style="background:#1e293b; border:1px solid #334155; padding:1px 5px; border-radius:4px; font-size:11px; color:#38bdf8;">Ctrl+V</kbd> ở bất kỳ đâu trên trang để dán ảnh, kéo thả file ảnh vào khung này, hoặc bấm nút <b>"🖼️ Đính Kèm Ảnh"</b>.</span>
-      </div>
-
-      <!-- Preview ảnh đính kèm nổi bật -->
-      <div id="imagePreviewContainer" style="display:none; margin-bottom:14px; align-items:center; gap:14px; background:linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.7)); border:1.5px solid #38bdf8; border-radius:10px; padding:10px 16px; width:fit-content; box-shadow:0 4px 16px rgba(56,189,248,0.15);">
-        <img id="imagePreviewThumb" src="" alt="Thumbnail" style="max-height:75px; max-width:110px; border-radius:6px; object-fit:contain; background:#000; border:1px solid #334155; cursor:pointer;" title="Bấm để xem ảnh phóng to">
-        <div style="font-size:12px;">
-          <div style="display:flex; align-items:center; gap:6px; margin-bottom:3px;">
-            <span style="color:#38bdf8; font-weight:700;">ĐÃ ĐÍNH KÈM:</span>
-            <span id="imagePreviewName" style="font-weight:600; color:#fff; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+          <div class="panel-actions">
+            <div class="view-switcher">
+              <button id="btnViewAccounts" class="tab-btn active">Tài khoản</button>
+              <button id="btnViewBrowsers" class="tab-btn">Trình duyệt</button>
+            </div>
+            <span class="tag tag-worker" id="pool-count-badge">0 Tab đang mở</span>
           </div>
-          <div id="imagePreviewSize" style="color:var(--text-muted); font-size:11px;"></div>
         </div>
-        <button type="button" id="removeImageBtn" class="btn btn-danger btn-sm" style="margin-left:10px;">❌ Bỏ ảnh</button>
+
+        <div id="viewAccountsContainer" class="table-wrap">
+          <table id="accountsTable">
+            <thead>
+              <tr>
+                <th>Tài khoản</th>
+                <th>Nền tảng</th>
+                <th>Trình duyệt &amp; OS</th>
+                <th>Trạng thái</th>
+                <th>Đã xử lý</th>
+                <th>Thời gian online</th>
+              </tr>
+            </thead>
+            <tbody id="accountsBody">
+              <tr><td colspan="6" class="empty-placeholder">Chưa có tài khoản nào kết nối qua Extension...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="viewBrowsersContainer" class="table-wrap" style="display:none;">
+          <table id="workersTable">
+            <thead>
+              <tr>
+                <th>Trình duyệt / Worker</th>
+                <th>Tài khoản đăng nhập</th>
+                <th>Worker ID</th>
+                <th>Trạng thái</th>
+                <th>Nền tảng</th>
+                <th>Đã hoàn tất</th>
+                <th>Thời gian chạy</th>
+              </tr>
+            </thead>
+            <tbody id="workersBody">
+              <tr><td colspan="7" class="empty-placeholder">Chưa có trình duyệt nào kết nối qua WebSocket...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Panel 2: Active Sessions -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </span>
+            <h2>Phiên hội thoại (Active Sessions)</h2>
+          </div>
+
+          <div class="panel-actions">
+            <button id="clearSessionsBtn" class="btn btn-danger btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Xóa tất cả</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="sessionsTable">
+            <thead>
+              <tr>
+                <th>Session ID</th>
+                <th>Provider</th>
+                <th>Tài khoản phục vụ</th>
+                <th>Worker Host</th>
+                <th>Lượt hỏi (Turn)</th>
+                <th>Tokens (ước tính)</th>
+                <th>Hoạt động cuối</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsBody">
+              <tr><td colspan="8" class="empty-placeholder">Chưa có session nào được tạo trong phiên này...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Panel 2.5: Live Web Models -->
+      <section class="panel" id="webModelsPanel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </span>
+            <h2>Model thực tế trên Web</h2>
+          </div>
+
+          <div class="panel-actions">
+            <span class="tag tag-worker" id="webModelsSummaryBadge">Chưa quét</span>
+            <button type="button" id="btnScanWebModels" class="btn btn-secondary btn-sm">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2v6h-6"></path>
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                <path d="M3 22v-6h6"></path>
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+              <span>Quét Model từ Web</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="panel-body" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px;">
+          <div style="background:var(--surface-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+              <span class="tag tag-chatgpt">ChatGPT Web</span>
+              <span id="webModelCurrentChatGPT" class="mono" style="font-size:11px; color:var(--text-muted);">Chưa nhận diện</span>
+            </div>
+            <div id="webModelsChatGPT" style="display:flex; flex-wrap:wrap; gap:6px;">
+              <span style="font-size:12px; color:var(--text-muted);">Bấm "Quét Model từ Web" để lấy danh sách từ tab chatgpt.com</span>
+            </div>
+          </div>
+
+          <div style="background:var(--surface-input); border:1px solid var(--border); border-radius:var(--radius-md); padding:12px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; gap:8px;">
+              <span class="tag tag-gemini">Google Gemini</span>
+              <span id="webModelCurrentGemini" class="mono" style="font-size:11px; color:var(--text-muted);">Chưa nhận diện</span>
+            </div>
+            <div id="webModelsGemini" style="display:flex; flex-wrap:wrap; gap:6px;">
+              <span style="font-size:12px; color:var(--text-muted);">Bấm "Quét Model từ Web" để lấy danh sách từ tab gemini.google.com</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: Live Prompt Playground & Multimodal Vision -->
+      <section class="panel" id="liveTestPanel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+            </span>
+            <h2>Kiểm thử trực tiếp &amp; Vision</h2>
+          </div>
+
+          <span id="visionReadyBadge" class="status-pill status-ready" style="display:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            <span>Ảnh sẵn sàng</span>
+          </span>
+        </div>
+
+        <div class="panel-body">
+          <div class="composer-row">
+            <select id="providerSelect" class="input-field" aria-label="Chọn nhà cung cấp AI">
+              <option value="chatgpt">ChatGPT Web</option>
+              <option value="gemini" selected>Google Gemini</option>
+            </select>
+            <input type="text" id="sessionIdInput" class="input-field input-session" placeholder="Session ID (tùy chọn)">
+            <input type="text" id="promptInput" class="input-field" placeholder="Nhập prompt hoặc dán ảnh (Ctrl+V)..." value="Hãy phân tích bức ảnh này giúp tôi">
+            <input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+            <button type="button" id="uploadImageBtn" class="btn btn-secondary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+              <span>Đính kèm ảnh</span>
+            </button>
+            <button id="sendBtn" class="btn btn-primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span>Gửi yêu cầu</span>
+            </button>
+          </div>
+
+          <div class="vision-hint">
+            <span>Multimodal Vision: Nhấn <kbd>Ctrl+V</kbd> để dán ảnh trực tiếp, kéo thả file vào khung này hoặc chọn từ máy.</span>
+          </div>
+
+          <div id="imagePreviewContainer" class="image-preview-card">
+            <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Thumbnail" title="Bấm để xem ảnh phóng to">
+            <div style="font-size:12px; min-width:0;">
+              <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                <span style="color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.04em;">Đính kèm</span>
+                <span id="imagePreviewName" style="font-weight:500; color:var(--text); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+              </div>
+              <div id="imagePreviewSize" class="mono" style="color:var(--text-muted); font-size:11px;"></div>
+            </div>
+            <button type="button" id="removeImageBtn" class="btn btn-danger btn-sm" style="margin-left:8px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              <span>Bỏ ảnh</span>
+            </button>
+          </div>
+
+          <div class="output-shell">
+            <div class="output-bar">
+              <span id="testMeta" class="output-meta">Sẵn sàng nhận luồng phản hồi SSE...</span>
+              <button type="button" id="copyOutputBtn" class="btn btn-secondary btn-sm">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Sao chép</span>
+              </button>
+            </div>
+            <pre id="outputBox">// Kết quả phản hồi thời gian thực sẽ hiển thị tại đây...</pre>
+            <div id="outputImagesContainer" class="response-images-grid" style="display:none;"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- VIEW 2: PROMPT HISTORY & REQUEST INSPECTOR -->
+    <main id="pageHistoryView" style="display:none;">
+      <!-- History Summary Strip -->
+      <section class="telemetry-grid telemetry-grid-4" aria-label="Thống kê lịch sử prompt">
+        <div class="metric-cell">
+          <span class="metric-label">Tổng lượt gọi</span>
+          <div class="metric-value" id="hist-total">0</div>
+          <span class="metric-sub">Bản ghi trong bộ nhớ</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Hoàn tất</span>
+          <div class="metric-value" id="hist-completed">0</div>
+          <span class="metric-sub">Trả lời thành công</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Lỗi / Đã hủy</span>
+          <div class="metric-value" id="hist-failed">0</div>
+          <span class="metric-sub">Error, Timeout, Cancel</span>
+        </div>
+        <div class="metric-cell">
+          <span class="metric-label">Tổng Tokens</span>
+          <div class="metric-value" id="hist-tokens">0</div>
+          <span class="metric-sub">Ước tính Prompt + Output</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <span class="panel-icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+              </svg>
+            </span>
+            <h2>Lịch sử Prompt &amp; Request Inspector</h2>
+          </div>
+
+          <div class="panel-actions">
+            <button type="button" id="btnExportHistory" class="btn btn-secondary btn-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Xuất JSON</span>
+            </button>
+            <button type="button" id="btnClearHistory" class="btn btn-danger btn-sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              <span>Xóa lịch sử</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="filter-toolbar">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="historySearchInput" class="input-field" placeholder="Tìm theo prompt, câu trả lời, Request ID, session...">
+          </div>
+
+          <select id="historyProviderSelect" class="input-field" aria-label="Lọc theo nền tảng">
+            <option value="all">Tất cả nền tảng</option>
+            <option value="chatgpt">ChatGPT Web</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+
+          <select id="historyStatusSelect" class="input-field" aria-label="Lọc theo trạng thái">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="completed">Hoàn tất</option>
+            <option value="running">Đang xử lý</option>
+            <option value="failed">Lỗi / Timeout</option>
+            <option value="cancelled">Đã hủy</option>
+          </select>
+        </div>
+
+        <div class="table-wrap">
+          <table id="historyTable">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>Nền tảng &amp; Tài khoản</th>
+                <th>Prompt &amp; Ngữ cảnh</th>
+                <th>Phản hồi / Kết quả</th>
+                <th>Trạng thái</th>
+                <th>Độ trễ &amp; Tokens</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody">
+              <tr><td colspan="7" class="empty-placeholder">Chưa có lịch sử prompt nào trong phiên server hiện tại...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Request Detail Inspector Modal -->
+  <div id="historyInspectorModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="inspectorTitle">
+    <div class="inspector-dialog">
+      <div class="inspector-header">
+        <div class="inspector-title-group">
+          <h3 id="inspectorTitle">Chi tiết Request</h3>
+          <span id="inspectorStatusPill" class="status-pill status-ready"><span class="status-dot"></span>Hoàn tất</span>
+        </div>
+        <button type="button" id="btnCloseInspector" class="btn btn-secondary btn-sm" aria-label="Đóng chi tiết">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+          <span>Đóng</span>
+        </button>
       </div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-        <span id="testMeta" style="font-size:12px; color:var(--text-muted); font-family:'JetBrains Mono', monospace;"></span>
+      <div class="inspector-body">
+        <div class="meta-grid" id="inspectorMetaGrid"></div>
+
+        <div class="inspector-section">
+          <div class="inspector-section-head">
+            <span class="inspector-section-title">Prompt đầu vào</span>
+            <div style="display:flex; gap:6px;">
+              <button type="button" id="btnCopyPrompt" class="btn btn-secondary btn-sm">Sao chép Prompt</button>
+              <button type="button" id="btnReplayFromInspector" class="btn btn-primary btn-sm">Nạp vào Playground</button>
+            </div>
+          </div>
+          <pre id="inspectorPromptText" class="inspector-pre"></pre>
+        </div>
+
+        <div class="inspector-section">
+          <div class="inspector-section-head">
+            <span id="inspectorResponseLabel" class="inspector-section-title">Phản hồi từ AI</span>
+            <button type="button" id="btnCopyResponse" class="btn btn-secondary btn-sm">Sao chép Phản hồi</button>
+          </div>
+          <pre id="inspectorResponseText" class="inspector-pre"></pre>
+          <div id="inspectorResponseImages" class="response-images-grid" style="display:none;"></div>
+        </div>
       </div>
-      <pre id="outputBox">// Kết quả phản hồi thời gian thực sẽ hiển thị tại đây...</pre>
     </div>
   </div>
 
   <script>
-    let currentViewMode = 'accounts'; // 'accounts' | 'browsers'
+    let currentViewMode = 'accounts';
+    let currentPage = (window.location.pathname === '/history' || window.location.hash === '#history') ? 'history' : 'overview';
+    let cachedHistoryItems = [];
+    let activeInspectorItem = null;
+
+    const pageOverviewView = document.getElementById('pageOverviewView');
+    const pageHistoryView = document.getElementById('pageHistoryView');
+    const navTabOverview = document.getElementById('navTabOverview');
+    const navTabHistory = document.getElementById('navTabHistory');
+    const navHistoryCount = document.getElementById('navHistoryCount');
 
     const btnViewAccounts = document.getElementById('btnViewAccounts');
     const btnViewBrowsers = document.getElementById('btnViewBrowsers');
@@ -478,13 +1515,87 @@
     const viewBrowsersContainer = document.getElementById('viewBrowsersContainer');
     const poolTableTitle = document.getElementById('poolTableTitle');
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function extractMarkdownImages(text) {
+      if (!text || typeof text !== 'string') return [];
+      const results = [];
+      const seen = new Set();
+      const regex = /!\[([^\]]*)\]\(([^)\s]+)\)/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const alt = (match[1] || 'Image').trim();
+        const url = (match[2] || '').trim();
+        if (!url || seen.has(url)) continue;
+        if (!url.startsWith('https://') && !url.startsWith('http://') && !url.startsWith('data:image/')) continue;
+        seen.add(url);
+        results.push({ alt, url });
+      }
+      return results;
+    }
+
+    function renderMarkdownImages(containerEl, text) {
+      if (!containerEl) return;
+      const imgs = extractMarkdownImages(text);
+      if (imgs.length === 0) {
+        containerEl.style.display = 'none';
+        containerEl.innerHTML = '';
+        return;
+      }
+      containerEl.style.display = 'grid';
+      containerEl.innerHTML = imgs.map(img => `
+        <a class="response-img-card" href="${escapeHtml(img.url)}" target="_blank" rel="noopener noreferrer" title="Mở ảnh kích thước gốc">
+          <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.alt)}" loading="lazy">
+          <span class="response-img-caption">${escapeHtml(img.alt || 'Hình ảnh phản hồi')}</span>
+        </a>
+      `).join('');
+    }
+
+    function switchPage(page, pushUrl = true) {
+      currentPage = page === 'history' ? 'history' : 'overview';
+      const isHistory = currentPage === 'history';
+
+      pageOverviewView.style.display = isHistory ? 'none' : 'block';
+      pageHistoryView.style.display = isHistory ? 'block' : 'none';
+      navTabOverview.classList.toggle('active', !isHistory);
+      navTabHistory.classList.toggle('active', isHistory);
+
+      if (pushUrl && window.history && window.history.pushState) {
+        const targetPath = isHistory ? '/history' : '/';
+        if (window.location.pathname !== targetPath) {
+          window.history.pushState({ page: currentPage }, '', targetPath);
+        }
+      }
+
+      if (isHistory) {
+        loadHistory();
+      } else {
+        updateStatus();
+      }
+    }
+
+    navTabOverview.addEventListener('click', () => switchPage('overview'));
+    navTabHistory.addEventListener('click', () => switchPage('history'));
+    window.addEventListener('popstate', () => {
+      const target = window.location.pathname === '/history' ? 'history' : 'overview';
+      switchPage(target, false);
+    });
+
     btnViewAccounts.addEventListener('click', () => {
       currentViewMode = 'accounts';
       btnViewAccounts.classList.add('active');
       btnViewBrowsers.classList.remove('active');
       viewAccountsContainer.style.display = 'block';
       viewBrowsersContainer.style.display = 'none';
-      poolTableTitle.innerText = '👤 Danh Sách Tài Khoản Đăng Nhập (Accounts Pool)';
+      poolTableTitle.innerText = 'Tài khoản kết nối';
       updateStatus();
     });
 
@@ -494,7 +1605,7 @@
       btnViewAccounts.classList.remove('active');
       viewAccountsContainer.style.display = 'none';
       viewBrowsersContainer.style.display = 'block';
-      poolTableTitle.innerText = '🌐 Cụm Trình Duyệt Thực Thi (Worker Pool)';
+      poolTableTitle.innerText = 'Cụm trình duyệt thực thi';
       updateStatus();
     });
 
@@ -507,12 +1618,46 @@
       return `${Math.floor(diff / 3600)}h trước`;
     }
 
+    function formatClockTime(isoString) {
+      if (!isoString) return '-';
+      try {
+        return new Date(isoString).toLocaleTimeString('vi-VN', { hour12: false });
+      } catch (_) {
+        return '-';
+      }
+    }
+
     function formatDuration(sec) {
       if (!sec || sec < 0) return '0s';
       if (sec < 60) return `${sec}s`;
       const m = Math.floor(sec / 60);
       const s = sec % 60;
       return `${m}m ${s}s`;
+    }
+
+    function formatMsDuration(ms) {
+      if (!ms || ms < 0) return '-';
+      if (ms < 1000) return `${ms}ms`;
+      return `${(ms / 1000).toFixed(2)}s`;
+    }
+
+    function renderHistoryStatusPill(status) {
+      if (status === 'completed') {
+        return '<span class="status-pill status-ready"><span class="status-dot"></span>Hoàn tất</span>';
+      }
+      if (status === 'running') {
+        return '<span class="status-pill status-busy"><span class="status-dot"></span>Đang xử lý</span>';
+      }
+      if (status === 'queued') {
+        return '<span class="status-pill status-offline"><span class="status-dot"></span>Đang chờ</span>';
+      }
+      if (status === 'timeout') {
+        return '<span class="status-pill status-closed"><span class="status-dot"></span>Timeout</span>';
+      }
+      if (status === 'cancelled') {
+        return '<span class="status-pill status-offline"><span class="status-dot"></span>Đã hủy</span>';
+      }
+      return '<span class="status-pill status-closed"><span class="status-dot"></span>Thất bại</span>';
     }
 
     async function updateStatus() {
@@ -523,10 +1668,15 @@
         const workers = Array.isArray(data.workers) ? data.workers : [];
         const accounts = Array.isArray(data.accounts) ? data.accounts : [];
         const isOnline = workers.length > 0;
-
         const readyAccounts = accounts.filter(a => a.status !== 'closed' && a.status !== 'offline');
 
-        // 1. Badge trạng thái kết nối
+        if (typeof data.historyCount === 'number') {
+          navHistoryCount.innerText = data.historyCount;
+        }
+        if (data.webModels) {
+          renderWebModels(data.webModels);
+        }
+
         const badge = document.getElementById('status-badge');
         const statusText = document.getElementById('status-text');
         if (isOnline) {
@@ -534,10 +1684,9 @@
           statusText.innerText = `${readyAccounts.length}/${accounts.length} Tab Online (${workers.length} Browser)`;
         } else {
           badge.className = 'badge badge-offline';
-          statusText.innerText = 'Chờ Extension';
+          statusText.innerText = 'Chờ kết nối Extension';
         }
 
-        // 2. Metrics cards
         document.getElementById('metric-accounts').innerText = `${readyAccounts.length}/${accounts.length}`;
         document.getElementById('metric-workers').innerText = workers.length;
         document.getElementById('metric-queue').innerText = data.queueLength || 0;
@@ -546,69 +1695,69 @@
         document.getElementById('metric-latency').innerText = ((data.stats?.avgExecutionTimeMs || 0) / 1000).toFixed(1) + 's';
 
         document.getElementById('pool-count-badge').innerText = currentViewMode === 'accounts'
-          ? `${readyAccounts.length}/${accounts.length} Tab Đang Mở`
-          : `${workers.length} Trình duyệt Active`;
+          ? `${readyAccounts.length}/${accounts.length} Tab đang mở`
+          : `${workers.length} Trình duyệt`;
 
-        // 3. Render Accounts View (Theo Tài Khoản Đăng Nhập)
         const accountsBody = document.getElementById('accountsBody');
         if (accounts.length === 0) {
-          accountsBody.innerHTML = '<tr><td colspan="6" class="empty-placeholder">Chưa có tài khoản nào được kết nối qua Extension...</td></tr>';
+          accountsBody.innerHTML = '<tr><td colspan="6" class="empty-placeholder">Chưa có tài khoản nào kết nối qua Extension...</td></tr>';
         } else {
           accountsBody.innerHTML = accounts.map(acc => {
             const isChatGPT = acc.provider === 'chatgpt';
-            const icon = isChatGPT ? '🤖' : '✨';
+            const avatar = isChatGPT
+              ? '<span class="provider-avatar gpt">GPT</span>'
+              : '<span class="provider-avatar gmn">GMN</span>';
             const provBadge = isChatGPT
               ? '<span class="tag tag-chatgpt">ChatGPT Web</span>'
               : '<span class="tag tag-gemini">Google Gemini</span>';
 
-            let statusBadge = '<span class="tag tag-idle" style="background:rgba(16,185,129,0.18); color:#34d399; border:1px solid rgba(16,185,129,0.35);">🟢 Sẵn sàng (Tab đang mở)</span>';
+            let statusPill = '<span class="status-pill status-ready"><span class="status-dot"></span>Sẵn sàng</span>';
             if (acc.status === 'generating') {
-              statusBadge = `<span class="tag tag-busy">🟡 Đang sinh câu trả lời (${(acc.runningMs / 1000).toFixed(1)}s)</span>`;
+              statusPill = `<span class="status-pill status-busy"><span class="status-dot"></span>Đang xử lý (${(acc.runningMs / 1000).toFixed(1)}s)</span>`;
             } else if (acc.status === 'closed') {
-              statusBadge = '<span class="tag" style="background:rgba(239,68,68,0.18); color:#f87171; border:1px solid rgba(239,68,68,0.4); font-weight:700;">🔴 Tab Đã Đóng (0 tab)</span>';
+              statusPill = '<span class="status-pill status-closed"><span class="status-dot"></span>Tab đã đóng</span>';
             } else if (!acc.connected || acc.status === 'offline') {
-              statusBadge = '<span class="tag tag-offline">⚫ Mất kết nối</span>';
+              statusPill = '<span class="status-pill status-offline"><span class="status-dot"></span>Mất kết nối</span>';
             }
 
-            const osText = acc.os === 'win' ? 'Windows' : acc.os === 'mac' ? 'macOS' : acc.os;
-            const hostDisplay = `<span style="font-weight:600; color:#fff;">${acc.browser} (${osText})</span> <span class="mono" style="color:var(--text-muted); font-size:11px;">[${acc.workerId.slice(-6)}]</span>`;
+            const osText = acc.os === 'win' ? 'Windows' : acc.os === 'mac' ? 'macOS' : (acc.os || 'OS');
+            const hostDisplay = `<span style="font-weight:500; color:var(--text);">${escapeHtml(acc.browser || 'Chrome')} (${escapeHtml(osText)})</span> <span class="mono" style="color:var(--text-muted); font-size:11px;">#${escapeHtml((acc.workerId || '').slice(-6))}</span>`;
 
             return `
               <tr>
                 <td>
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:16px;">${icon}</span>
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    ${avatar}
                     <div>
-                      <div style="font-weight:700; color:#fff;">${acc.accountName}</div>
-                      ${acc.accountEmail ? `<div style="font-size:11px; color:var(--primary); font-family:'JetBrains Mono',monospace;">${acc.accountEmail}</div>` : ''}
+                      <div style="font-weight:500; color:var(--text);">${escapeHtml(acc.accountName)}</div>
+                      ${acc.accountEmail ? `<div class="mono" style="font-size:11px; color:var(--text-muted);">${escapeHtml(acc.accountEmail)}</div>` : ''}
                     </div>
                   </div>
                 </td>
                 <td>${provBadge}</td>
                 <td>${hostDisplay}</td>
-                <td>${statusBadge}</td>
-                <td><span class="mono" style="color:var(--accent); font-weight:700;">${acc.completed}</span> <span style="font-size:11px; color:var(--text-muted);">/ lỗi: ${acc.failed}</span></td>
+                <td>${statusPill}</td>
+                <td><span class="mono" style="color:var(--text); font-weight:500;">${acc.completed || 0}</span> <span style="font-size:11px; color:var(--text-muted);">/ lỗi: ${acc.failed || 0}</span></td>
                 <td><span class="mono">${formatDuration(acc.uptimeSeconds)}</span></td>
               </tr>
             `;
           }).join('');
         }
 
-        // 4. Render Browsers View (Theo Cụm Trình Duyệt)
         const workersBody = document.getElementById('workersBody');
         if (workers.length === 0) {
-          workersBody.innerHTML = '<tr><td colspan="7" class="empty-placeholder">Chưa có trình duyệt nào kết nối qua Extension WebSocket...</td></tr>';
+          workersBody.innerHTML = '<tr><td colspan="7" class="empty-placeholder">Chưa có trình duyệt nào kết nối qua WebSocket...</td></tr>';
         } else {
           workersBody.innerHTML = workers.map(w => {
             const hasChatGPT = w.activeTasks && w.activeTasks.some(t => t.provider === 'chatgpt');
             const hasGemini = w.activeTasks && w.activeTasks.some(t => t.provider === 'gemini');
-            let statusBadge = '<span class="tag tag-idle">Sẵn sàng (Idle)</span>';
+            let statusPill = '<span class="status-pill status-ready"><span class="status-dot"></span>Sẵn sàng</span>';
             if (hasChatGPT && hasGemini) {
-              statusBadge = '<span class="tag tag-busy">Đang sinh ChatGPT + Gemini</span>';
+              statusPill = '<span class="status-pill status-busy"><span class="status-dot"></span>Đang xử lý ChatGPT + Gemini</span>';
             } else if (hasChatGPT) {
-              statusBadge = '<span class="tag tag-chatgpt">Đang sinh ChatGPT</span>';
+              statusPill = '<span class="status-pill status-busy"><span class="status-dot"></span>Đang xử lý ChatGPT</span>';
             } else if (hasGemini) {
-              statusBadge = '<span class="tag tag-gemini">Đang sinh Gemini</span>';
+              statusPill = '<span class="status-pill status-busy"><span class="status-dot"></span>Đang xử lý Gemini</span>';
             }
 
             const providerTags = (w.providers || []).map(p =>
@@ -618,33 +1767,32 @@
             const acc = w.accounts || {};
             const accountBadges = [];
             if (acc.gemini && (acc.gemini.email || acc.gemini.name)) {
-              accountBadges.push(`<span class="tag tag-gemini">Google: ${acc.gemini.email || acc.gemini.name}</span>`);
+              accountBadges.push(`<span class="tag tag-gemini">Google: ${escapeHtml(acc.gemini.email || acc.gemini.name)}</span>`);
             }
             if (acc.chatgpt && (acc.chatgpt.name || acc.chatgpt.email)) {
-              accountBadges.push(`<span class="tag tag-chatgpt">OpenAI: ${acc.chatgpt.name || acc.chatgpt.email}</span>`);
+              accountBadges.push(`<span class="tag tag-chatgpt">OpenAI: ${escapeHtml(acc.chatgpt.name || acc.chatgpt.email)}</span>`);
             }
-            if (acc.chromeProfileEmail && !accountBadges.some(b => b.includes(acc.chromeProfileEmail))) {
-              accountBadges.push(`<span class="tag tag-worker">Sync: ${acc.chromeProfileEmail}</span>`);
+            if (acc.chromeProfileEmail && !accountBadges.some(b => b.includes(escapeHtml(acc.chromeProfileEmail)))) {
+              accountBadges.push(`<span class="tag tag-worker">Sync: ${escapeHtml(acc.chromeProfileEmail)}</span>`);
             }
             if (accountBadges.length === 0) {
-              accountBadges.push(`<span style="color:var(--text-muted); font-size:11px;">${acc.browser || 'Browser'}</span>`);
+              accountBadges.push(`<span style="color:var(--text-muted); font-size:12px;">${escapeHtml(acc.browser || 'Browser')}</span>`);
             }
 
             return `
               <tr>
-                <td><strong>${w.name}</strong></td>
-                <td><div style="display:flex; flex-direction:column; gap:4px;">${accountBadges.join('')}</div></td>
-                <td><span class="mono">${w.id}</span></td>
-                <td>${statusBadge}</td>
+                <td><strong style="color:var(--text); font-weight:500;">${escapeHtml(w.name)}</strong></td>
+                <td><div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">${accountBadges.join('')}</div></td>
+                <td><span class="mono">${escapeHtml(w.id)}</span></td>
+                <td>${statusPill}</td>
                 <td>${providerTags || '-'}</td>
-                <td><span class="mono" style="color:var(--accent);">${w.stats?.completed || 0}</span> <span style="font-size:11px; color:var(--text-muted);">/ lỗi: ${w.stats?.failed || 0}</span></td>
+                <td><span class="mono" style="color:var(--text); font-weight:500;">${w.stats?.completed || 0}</span> <span style="font-size:11px; color:var(--text-muted);">/ lỗi: ${w.stats?.failed || 0}</span></td>
                 <td><span class="mono">${formatDuration(w.uptimeSeconds)}</span></td>
               </tr>
             `;
           }).join('');
         }
 
-        // 5. Render Active Sessions Table kèm Tài khoản Phục Vụ
         const sessionsBody = document.getElementById('sessionsBody');
         const sessionList = Array.isArray(data.sessionList) ? data.sessionList : [];
         if (sessionList.length === 0) {
@@ -657,31 +1805,31 @@
               : '<span class="tag tag-gemini">Gemini</span>';
 
             const accountTag = s.account
-              ? `<span style="font-weight:600; color:#fff;">👤 ${s.account}</span>`
-              : `<span style="color:var(--text-muted); font-size:11px;">Mặc định</span>`;
+              ? `<span style="font-weight:500; color:var(--text);">${escapeHtml(s.account)}</span>`
+              : '<span style="color:var(--text-muted); font-size:12px;">Mặc định</span>';
 
             const workerHostTag = s.workerId
-              ? `<span class="tag tag-worker">🖥️ ${s.workerName || s.workerId}</span>`
-              : '<span style="color:var(--text-muted); font-size:11px;">Chưa gán</span>';
+              ? `<span class="tag tag-worker">${escapeHtml(s.workerName || s.workerId)}</span>`
+              : '<span style="color:var(--text-muted); font-size:12px;">Chưa gán</span>';
 
             const activeTabNotice = (s.isActiveChatGPT || s.isActiveGemini)
-              ? '<span style="color:var(--accent); font-size:11px; margin-left:6px;" title="Tab đang mở sẵn thread này">● Active Tab</span>'
+              ? '<span class="status-dot" style="display:inline-block; background:var(--emerald); margin-left:6px; vertical-align:middle;" title="Tab đang mở sẵn thread này"></span>'
               : '';
 
             return `
               <tr>
                 <td>
-                  <span class="mono" style="font-weight:600; color:#fff;">${s.id}</span>
+                  <span class="mono" style="font-weight:500; color:var(--text);">${escapeHtml(s.id)}</span>
                   ${activeTabNotice}
                 </td>
                 <td>${provTag}</td>
                 <td>${accountTag}</td>
                 <td>${workerHostTag}</td>
                 <td><span class="mono">${s.turnCount}</span> <span style="color:var(--text-muted); font-size:11px;">(Recycles: ${s.recycleCount})</span></td>
-                <td><span class="mono" style="color:var(--primary);">${s.totalTokens ? s.totalTokens.toLocaleString() : 0}</span></td>
+                <td><span class="mono" style="color:var(--text);">${s.totalTokens ? s.totalTokens.toLocaleString() : 0}</span></td>
                 <td style="font-size:12px;">${formatRelativeTime(s.lastActiveAt)}</td>
                 <td>
-                  <button class="btn btn-danger btn-sm" onclick="deleteSingleSession('${s.id}')">Xóa</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteSingleSession('${escapeHtml(s.id)}')">Xóa</button>
                 </td>
               </tr>
             `;
@@ -690,8 +1838,337 @@
       } catch (e) {}
     }
 
-    setInterval(updateStatus, 1500);
-    updateStatus();
+    // Prompt History Logic
+    const btnScanWebModels = document.getElementById('btnScanWebModels');
+    const btnScanWebModelsDefaultHtml = btnScanWebModels.innerHTML;
+    const webModelsSummaryBadge = document.getElementById('webModelsSummaryBadge');
+    const webModelCurrentChatGPT = document.getElementById('webModelCurrentChatGPT');
+    const webModelCurrentGemini = document.getElementById('webModelCurrentGemini');
+    const webModelsChatGPT = document.getElementById('webModelsChatGPT');
+    const webModelsGemini = document.getElementById('webModelsGemini');
+
+    function renderWebModels(webModels) {
+      if (!webModels || !webModels.providers) return;
+      const providers = webModels.providers;
+      const allModels = Array.isArray(webModels.models) ? webModels.models : [];
+
+      webModelsSummaryBadge.innerText = allModels.length > 0
+        ? `${allModels.length} Models thực tế`
+        : 'Chưa có danh sách';
+
+      const renderProviderList = (provKey, provData, currentEl, listEl, fallbackMsg) => {
+        const current = provData?.currentModel;
+        currentEl.innerText = current ? `Active: ${current}` : 'Chưa nhận diện';
+
+        const list = Array.isArray(provData?.models) ? provData.models : [];
+        if (list.length === 0) {
+          listEl.innerHTML = `<span style="font-size:12px; color:var(--text-muted);">${escapeHtml(fallbackMsg)}</span>`;
+          return;
+        }
+
+        listEl.innerHTML = list.map(m => {
+          const pillClass = m.active ? 'status-pill status-ready' : 'tag tag-worker';
+          const dotHtml = m.active ? '<span class="status-dot"></span>' : '';
+          const titleAttr = m.description ? `${m.id} — ${m.description}` : m.id;
+          return `<button type="button" class="${pillClass}" style="cursor:pointer;" title="${escapeHtml(titleAttr)}" onclick="selectProviderForTest('${provKey}')">${dotHtml}<span>${escapeHtml(m.name || m.id)}</span></button>`;
+        }).join('');
+      };
+
+      renderProviderList(
+        'chatgpt',
+        providers.chatgpt,
+        webModelCurrentChatGPT,
+        webModelsChatGPT,
+        'Bấm "Quét Model từ Web" để lấy danh sách từ tab chatgpt.com'
+      );
+      renderProviderList(
+        'gemini',
+        providers.gemini,
+        webModelCurrentGemini,
+        webModelsGemini,
+        'Bấm "Quét Model từ Web" để lấy danh sách từ tab gemini.google.com'
+      );
+    }
+
+    function selectProviderForTest(provider) {
+      providerSelect.value = provider === 'gemini' ? 'gemini' : 'chatgpt';
+      promptInput.focus();
+    }
+
+    btnScanWebModels.addEventListener('click', async () => {
+      try {
+        btnScanWebModels.disabled = true;
+        btnScanWebModels.textContent = 'Đang quét tab...';
+        const res = await fetch('/api/web-models?refresh=true');
+        const data = await res.json();
+        if (data.status === 'ok') {
+          renderWebModels(data);
+        }
+      } catch (err) {
+        alert('Lỗi quét model từ tab web: ' + err.message);
+      } finally {
+        btnScanWebModels.disabled = false;
+        btnScanWebModels.innerHTML = btnScanWebModelsDefaultHtml;
+      }
+    });
+
+    const historySearchInput = document.getElementById('historySearchInput');
+    const historyProviderSelect = document.getElementById('historyProviderSelect');
+    const historyStatusSelect = document.getElementById('historyStatusSelect');
+    const historyBody = document.getElementById('historyBody');
+    const btnExportHistory = document.getElementById('btnExportHistory');
+    const btnClearHistory = document.getElementById('btnClearHistory');
+
+    const historyInspectorModal = document.getElementById('historyInspectorModal');
+    const btnCloseInspector = document.getElementById('btnCloseInspector');
+    const inspectorTitle = document.getElementById('inspectorTitle');
+    const inspectorStatusPill = document.getElementById('inspectorStatusPill');
+    const inspectorMetaGrid = document.getElementById('inspectorMetaGrid');
+    const inspectorPromptText = document.getElementById('inspectorPromptText');
+    const inspectorResponseLabel = document.getElementById('inspectorResponseLabel');
+    const inspectorResponseText = document.getElementById('inspectorResponseText');
+    const inspectorResponseImages = document.getElementById('inspectorResponseImages');
+    const btnCopyPrompt = document.getElementById('btnCopyPrompt');
+    const btnCopyResponse = document.getElementById('btnCopyResponse');
+    const btnReplayFromInspector = document.getElementById('btnReplayFromInspector');
+
+    let historySearchTimer = null;
+    historySearchInput.addEventListener('input', () => {
+      clearTimeout(historySearchTimer);
+      historySearchTimer = setTimeout(loadHistory, 180);
+    });
+    historyProviderSelect.addEventListener('change', loadHistory);
+    historyStatusSelect.addEventListener('change', loadHistory);
+
+    async function loadHistory() {
+      try {
+        const params = new URLSearchParams();
+        const q = historySearchInput.value.trim();
+        const provider = historyProviderSelect.value;
+        const status = historyStatusSelect.value;
+        if (q) params.set('q', q);
+        if (provider && provider !== 'all') params.set('provider', provider);
+        if (status && status !== 'all') params.set('status', status);
+
+        const res = await fetch('/api/history?' + params.toString());
+        const data = await res.json();
+        if (data.status !== 'ok') return;
+
+        cachedHistoryItems = Array.isArray(data.items) ? data.items : [];
+        const summary = data.summary || {};
+
+        document.getElementById('hist-total').innerText = summary.total || 0;
+        document.getElementById('hist-completed').innerText = summary.completed || 0;
+        document.getElementById('hist-failed').innerText = summary.failed || 0;
+        document.getElementById('hist-tokens').innerText = (summary.totalTokens || 0).toLocaleString();
+        navHistoryCount.innerText = summary.total || 0;
+
+        if (cachedHistoryItems.length === 0) {
+          historyBody.innerHTML = '<tr><td colspan="7" class="empty-placeholder">Không tìm thấy bản ghi prompt nào phù hợp...</td></tr>';
+          return;
+        }
+
+        historyBody.innerHTML = cachedHistoryItems.map(item => {
+          const isChatGPT = item.provider === 'chatgpt';
+          const provTag = isChatGPT
+            ? '<span class="tag tag-chatgpt">ChatGPT</span>'
+            : '<span class="tag tag-gemini">Gemini</span>';
+
+          const contextTags = [];
+          if (item.hasImages) {
+            contextTags.push(`<span class="tag tag-vision">Vision (${item.imageCount || 1})</span>`);
+          }
+          if (item.stream) {
+            contextTags.push('<span class="tag">Stream</span>');
+          }
+          if (item.sessionId) {
+            const shortSid = item.sessionId.length > 18 ? item.sessionId.slice(0, 18) + '...' : item.sessionId;
+            contextTags.push(`<span class="tag tag-worker" title="${escapeHtml(item.sessionId)}">Session: ${escapeHtml(shortSid)}</span>`);
+          }
+
+          let responseCellHtml = '<span class="text-snippet-muted" style="color:var(--text-muted);">Đang chờ phản hồi...</span>';
+          if (item.error) {
+            responseCellHtml = `<div class="text-snippet text-snippet-err">${escapeHtml(item.error)}</div>`;
+          } else if (item.answer) {
+            const respImgs = extractMarkdownImages(item.answer);
+            const imgBadge = respImgs.length > 0
+              ? `<div class="tag-list-inline"><span class="tag tag-vision">Ảnh phản hồi (${respImgs.length})</span></div>`
+              : '';
+            responseCellHtml = `<div class="text-snippet text-snippet-muted">${escapeHtml(item.answer)}</div>${imgBadge}`;
+          }
+
+          const durationText = item.durationMs > 0
+            ? formatMsDuration(item.durationMs)
+            : (item.status === 'running' ? 'Đang chạy' : '-');
+
+          return `
+            <tr class="clickable-row" onclick="openHistoryInspector('${escapeHtml(item.id)}')">
+              <td>
+                <div class="mono" style="color:var(--text);">${formatClockTime(item.createdAt)}</div>
+                <div style="font-size:11px; color:var(--text-muted);">${formatRelativeTime(item.createdAt)}</div>
+              </td>
+              <td>
+                <div style="margin-bottom:4px;">${provTag}</div>
+                <div style="font-size:11.5px; color:var(--text-secondary);">${escapeHtml(item.account || item.workerName || 'Chưa gán')}</div>
+              </td>
+              <td>
+                <div class="text-snippet">${escapeHtml(item.prompt)}</div>
+                ${contextTags.length > 0 ? `<div class="tag-list-inline">${contextTags.join('')}</div>` : ''}
+              </td>
+              <td>${responseCellHtml}</td>
+              <td>${renderHistoryStatusPill(item.status)}</td>
+              <td>
+                <div class="mono" style="color:var(--text);">${durationText}</div>
+                <div class="mono" style="font-size:11px; color:var(--text-muted);">${(item.totalTokens || 0).toLocaleString()} tok</div>
+              </td>
+              <td>
+                <div style="display:flex; gap:5px;" onclick="event.stopPropagation()">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openHistoryInspector('${escapeHtml(item.id)}')">Chi tiết</button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="replayHistoryItem('${escapeHtml(item.id)}')">Thử lại</button>
+                  <button type="button" class="btn btn-danger btn-sm" onclick="deleteHistoryItem('${escapeHtml(item.id)}')">Xóa</button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (_) {}
+    }
+
+    function openHistoryInspector(id) {
+      const item = cachedHistoryItems.find(x => x.id === id);
+      if (!item) return;
+      activeInspectorItem = item;
+
+      inspectorTitle.innerText = `Request ${item.id}`;
+      inspectorStatusPill.outerHTML = renderHistoryStatusPill(item.status).replace('<span class="status-pill', '<span id="inspectorStatusPill" class="status-pill');
+
+      const metaRows = [
+        { label: 'Request ID', value: item.id },
+        { label: 'Nền tảng', value: item.provider === 'gemini' ? 'Google Gemini' : 'ChatGPT Web' },
+        { label: 'Worker Host', value: item.workerName || item.workerId || '-' },
+        { label: 'Tài khoản', value: item.account || '-' },
+        { label: 'Session ID', value: item.sessionId || 'Tạo mới (None)' },
+        { label: 'Chế độ', value: `${item.stream ? 'SSE Stream' : 'Standard'}${item.hasImages ? ` + Vision (${item.imageCount})` : ''}` },
+        { label: 'Chờ hàng đợi', value: formatMsDuration(item.waitMs) },
+        { label: 'Thời gian xử lý', value: formatMsDuration(item.durationMs) },
+        { label: 'Tokens (In / Out)', value: `${item.promptTokens || 0} / ${item.completionTokens || 0} (Tổng: ${item.totalTokens || 0})` }
+      ];
+
+      inspectorMetaGrid.innerHTML = metaRows.map(r => `
+        <div class="meta-box">
+          <div class="meta-box-label">${escapeHtml(r.label)}</div>
+          <div class="meta-box-value">${escapeHtml(r.value)}</div>
+        </div>
+      `).join('');
+
+      inspectorPromptText.textContent = item.prompt || '';
+
+      if (item.error) {
+        inspectorResponseLabel.innerText = 'Thông báo lỗi';
+        inspectorResponseText.classList.add('error-text');
+        inspectorResponseText.textContent = item.error;
+        renderMarkdownImages(inspectorResponseImages, '');
+      } else {
+        inspectorResponseLabel.innerText = 'Phản hồi từ AI';
+        inspectorResponseText.classList.remove('error-text');
+        inspectorResponseText.textContent = item.answer || '(Chưa có nội dung phản hồi)';
+        renderMarkdownImages(inspectorResponseImages, item.answer || '');
+      }
+
+      historyInspectorModal.classList.add('open');
+    }
+
+    function closeHistoryInspector() {
+      historyInspectorModal.classList.remove('open');
+      activeInspectorItem = null;
+    }
+
+    btnCloseInspector.addEventListener('click', closeHistoryInspector);
+    historyInspectorModal.addEventListener('click', (e) => {
+      if (e.target === historyInspectorModal) closeHistoryInspector();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && historyInspectorModal.classList.contains('open')) {
+        closeHistoryInspector();
+      }
+    });
+
+    async function copyTextWithFeedback(btn, text) {
+      const original = btn.textContent;
+      try {
+        await navigator.clipboard.writeText(text || '');
+        btn.textContent = 'Đã chép';
+        setTimeout(() => {
+          btn.textContent = original;
+        }, 1400);
+      } catch (_) {}
+    }
+
+    btnCopyPrompt.addEventListener('click', () => {
+      copyTextWithFeedback(btnCopyPrompt, inspectorPromptText.textContent);
+    });
+
+    btnCopyResponse.addEventListener('click', () => {
+      copyTextWithFeedback(btnCopyResponse, inspectorResponseText.textContent);
+    });
+
+    function replayHistoryItem(id) {
+      const item = cachedHistoryItems.find(x => x.id === id);
+      if (!item) return;
+      closeHistoryInspector();
+      switchPage('overview');
+      providerSelect.value = item.provider === 'gemini' ? 'gemini' : 'chatgpt';
+      sessionIdInput.value = item.sessionId || '';
+      promptInput.value = item.prompt || '';
+      promptInput.focus();
+      liveTestPanel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    btnReplayFromInspector.addEventListener('click', () => {
+      if (activeInspectorItem) {
+        replayHistoryItem(activeInspectorItem.id);
+      }
+    });
+
+    async function deleteHistoryItem(id) {
+      try {
+        await fetch(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        loadHistory();
+      } catch (err) {
+        alert('Lỗi xóa bản ghi lịch sử: ' + err.message);
+      }
+    }
+
+    btnClearHistory.addEventListener('click', async () => {
+      if (!confirm('Xóa toàn bộ lịch sử prompt đã hoàn tất?')) return;
+      try {
+        await fetch('/api/history/clear', { method: 'POST' });
+        loadHistory();
+      } catch (err) {
+        alert('Lỗi xóa lịch sử: ' + err.message);
+      }
+    });
+
+    btnExportHistory.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(cachedHistoryItems, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-bridge-history-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    setInterval(() => {
+      updateStatus();
+      if (currentPage === 'history') {
+        loadHistory();
+      }
+    }, 1800);
+
+    switchPage(currentPage, false);
 
     async function deleteSingleSession(sessionId) {
       if (!confirm(`Bạn có chắc chắn muốn xóa session "${sessionId}"?`)) return;
@@ -714,11 +2191,12 @@
     });
 
     const clearQueueBtn = document.getElementById('clearQueueBtn');
+    const clearQueueDefaultHtml = clearQueueBtn.innerHTML;
     clearQueueBtn.addEventListener('click', async () => {
       if (!confirm('Bạn có chắc chắn muốn dọn sạch hàng đợi và hủy tác vụ đang chạy?')) return;
       try {
         clearQueueBtn.disabled = true;
-        clearQueueBtn.innerText = 'Đang dọn...';
+        clearQueueBtn.textContent = 'Đang dọn...';
         const res = await fetch('/queue/clear', { method: 'POST' });
         const data = await res.json();
         alert(data.message || 'Hàng đợi đã được dọn sạch!');
@@ -727,15 +2205,17 @@
         alert('Lỗi khi xóa hàng đợi: ' + err.message);
       } finally {
         clearQueueBtn.disabled = false;
-        clearQueueBtn.innerText = '🗑️ Clear Queue';
+        clearQueueBtn.innerHTML = clearQueueDefaultHtml;
       }
     });
 
     const sendBtn = document.getElementById('sendBtn');
+    const sendBtnDefaultHtml = sendBtn.innerHTML;
     const promptInput = document.getElementById('promptInput');
     const sessionIdInput = document.getElementById('sessionIdInput');
     const providerSelect = document.getElementById('providerSelect');
     const outputBox = document.getElementById('outputBox');
+    const outputImagesContainer = document.getElementById('outputImagesContainer');
     const testMeta = document.getElementById('testMeta');
     const liveTestPanel = document.getElementById('liveTestPanel');
     const imageFileInput = document.getElementById('imageFileInput');
@@ -746,8 +2226,20 @@
     const imagePreviewSize = document.getElementById('imagePreviewSize');
     const removeImageBtn = document.getElementById('removeImageBtn');
     const visionReadyBadge = document.getElementById('visionReadyBadge');
+    const copyOutputBtn = document.getElementById('copyOutputBtn');
+    const copyOutputDefaultHtml = copyOutputBtn.innerHTML;
 
     let attachedImageDataUrl = null;
+
+    copyOutputBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(outputBox.innerText || '');
+        copyOutputBtn.textContent = 'Đã chép';
+        setTimeout(() => {
+          copyOutputBtn.innerHTML = copyOutputDefaultHtml;
+        }, 1500);
+      } catch (_) {}
+    });
 
     uploadImageBtn.addEventListener('click', () => {
       imageFileInput.click();
@@ -765,7 +2257,7 @@
     imagePreviewThumb.addEventListener('click', () => {
       if (attachedImageDataUrl) {
         const win = window.open('');
-        win.document.write(`<title>Xem ảnh đính kèm</title><body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${attachedImageDataUrl}" style="max-width:95vw;max-height:95vh;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.8);"></body>`);
+        win.document.write(`<title>Xem ảnh đính kèm</title><body style="margin:0;background:#09090b;display:flex;align-items:center;justify-content:center;height:100vh;"><img src="${attachedImageDataUrl}" style="max-width:95vw;max-height:95vh;border-radius:8px;border:1px solid #27272a;"></body>`);
       }
     });
 
@@ -789,8 +2281,8 @@
         const sizeKb = (file.size ? (file.size / 1024).toFixed(1) : (attachedImageDataUrl.length * 0.75 / 1024).toFixed(1));
         imagePreviewSize.innerText = `${sizeKb} KB`;
         imagePreviewContainer.style.display = 'flex';
-        visionReadyBadge.style.display = 'inline-block';
-        testMeta.innerText = `🖼️ Đã nạp ảnh thành công (${sizeKb} KB). Sẵn sàng gửi kèm prompt!`;
+        visionReadyBadge.style.display = 'inline-flex';
+        testMeta.innerText = `Đã nạp ảnh (${sizeKb} KB) — Sẵn sàng gửi kèm prompt`;
       };
       reader.readAsDataURL(file);
     }
@@ -801,15 +2293,13 @@
       imagePreviewThumb.src = '';
       imagePreviewContainer.style.display = 'none';
       visionReadyBadge.style.display = 'none';
-      testMeta.innerText = '';
+      testMeta.innerText = 'Sẵn sàng nhận luồng phản hồi SSE...';
     }
 
-    // 1. HỖ TRỢ DÁN ẢNH TỪ CLIPBOARD (Ctrl+V) TRÊN TOÀN BỘ GIAO DIỆN DASHBOARD
     window.addEventListener('paste', (e) => {
       const clipboard = e.clipboardData;
       if (!clipboard) return;
 
-      // Kiểm tra danh sách files trong clipboard
       if (clipboard.files && clipboard.files.length > 0) {
         for (const file of clipboard.files) {
           if (isImageFile(file)) {
@@ -820,7 +2310,6 @@
         }
       }
 
-      // Kiểm tra clipboard items (ảnh chụp màn hình, Snipping tool, copy ảnh web)
       if (clipboard.items && clipboard.items.length > 0) {
         for (const item of clipboard.items) {
           if (item.type && item.type.startsWith('image/')) {
@@ -834,7 +2323,6 @@
         }
       }
 
-      // Kiểm tra chuỗi Data URL Base64 dán vào text
       const pastedText = clipboard.getData('text')?.trim();
       if (pastedText && pastedText.startsWith('data:image/')) {
         e.preventDefault();
@@ -843,26 +2331,22 @@
         imagePreviewName.innerText = 'Base64 Image';
         imagePreviewSize.innerText = `${(pastedText.length * 0.75 / 1024).toFixed(1)} KB`;
         imagePreviewContainer.style.display = 'flex';
-        visionReadyBadge.style.display = 'inline-block';
+        visionReadyBadge.style.display = 'inline-flex';
       }
     });
 
-    // 2. HỖ TRỢ KÉO THẢ FILE ẢNH TRỰC TIẾP VÀO LIVE TEST PANEL (Drag & Drop)
     liveTestPanel.addEventListener('dragover', (e) => {
       e.preventDefault();
-      liveTestPanel.style.borderColor = 'var(--primary)';
-      liveTestPanel.style.backgroundColor = 'rgba(56, 189, 248, 0.05)';
+      liveTestPanel.classList.add('panel-dragover');
     });
 
     liveTestPanel.addEventListener('dragleave', () => {
-      liveTestPanel.style.borderColor = 'var(--border)';
-      liveTestPanel.style.backgroundColor = '';
+      liveTestPanel.classList.remove('panel-dragover');
     });
 
     liveTestPanel.addEventListener('drop', (e) => {
       e.preventDefault();
-      liveTestPanel.style.borderColor = 'var(--border)';
-      liveTestPanel.style.backgroundColor = '';
+      liveTestPanel.classList.remove('panel-dragover');
 
       const dt = e.dataTransfer;
       if (dt && dt.files && dt.files.length > 0) {
@@ -875,7 +2359,7 @@
       }
     });
 
-    sendBtn.addEventListener('click', async () => {
+    async function submitLiveTest() {
       const prompt = promptInput.value.trim();
       const provider = providerSelect.value;
       const customSessionId = sessionIdInput.value.trim() || undefined;
@@ -883,9 +2367,10 @@
       if (!prompt && !attachedImageDataUrl) return;
 
       sendBtn.disabled = true;
-      sendBtn.innerText = 'Đang nhận...';
-      outputBox.innerText = `Connecting to ${provider.toUpperCase()} (Vision Multimodal)...\n`;
-      testMeta.innerText = 'Đang gửi lệnh và hình ảnh tới worker pool...';
+      sendBtn.textContent = 'Đang xử lý...';
+      outputBox.innerText = `Connecting to ${provider.toUpperCase()}...\n`;
+      renderMarkdownImages(outputImagesContainer, '');
+      testMeta.innerText = 'Đang gửi lệnh tới Worker Pool...';
 
       const startTime = Date.now();
 
@@ -922,30 +2407,45 @@
               try {
                 const parsed = JSON.parse(rawData);
                 if (parsed.status === 'session_init') {
-                  testMeta.innerText = `Session: ${parsed.session?.id} | Provider: ${parsed.provider}`;
+                  testMeta.innerText = `Session: ${parsed.session?.id || 'N/A'} | Provider: ${parsed.provider}`;
                 } else if (parsed.fullText) {
                   fullAnswer = parsed.fullText;
                   outputBox.innerText = fullAnswer;
+                  renderMarkdownImages(outputImagesContainer, fullAnswer);
                 } else if (parsed.chunk) {
                   fullAnswer += parsed.chunk;
                   outputBox.innerText = fullAnswer;
+                  renderMarkdownImages(outputImagesContainer, fullAnswer);
                 } else if (parsed.status === 'done') {
                   const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
                   const workerInfo = parsed.workerName || parsed.workerId || 'Worker';
-                  testMeta.innerText = `✅ Hoàn thành qua [${workerInfo}] | Thời gian: ${elapsed}s | Session: ${parsed.session?.id || 'N/A'}`;
+                  testMeta.innerText = `Hoàn tất qua [${workerInfo}] | Thời gian: ${elapsed}s | Session: ${parsed.session?.id || 'N/A'}`;
+                  renderMarkdownImages(outputImagesContainer, parsed.answer || fullAnswer);
                   updateStatus();
+                } else if (parsed.status === 'error') {
+                  outputBox.innerText += `\n[Error] ${parsed.error || 'Unknown error'}`;
+                  testMeta.innerText = 'Lỗi thực thi tác vụ';
                 }
               } catch (e) {}
             }
           }
         }
       } catch (err) {
-        outputBox.innerText += '\n❌ Lỗi: ' + err.message;
-        testMeta.innerText = '❌ Lỗi kết nối';
+        outputBox.innerText += '\n[Error] ' + err.message;
+        testMeta.innerText = 'Lỗi kết nối Server';
       } finally {
         sendBtn.disabled = false;
-        sendBtn.innerText = '🚀 Gửi (Stream SSE)';
+        sendBtn.innerHTML = sendBtnDefaultHtml;
         updateStatus();
+      }
+    }
+
+    sendBtn.addEventListener('click', submitLiveTest);
+
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitLiveTest();
       }
     });
   </script>

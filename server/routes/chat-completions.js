@@ -18,17 +18,52 @@ const config = require('../config');
 const { OPENAI, HTTP_STATUS } = require('../constants');
 const { extractMessageContent, extractMessageImages, resolveImages } = require('../image-handler');
 
-// 1. Danh sách Models — sinh động từ config.providers (nguồn chân lý duy nhất)
-router.get('/models', (req, res) => {
+// 1. Danh sách Models — kết hợp danh sách quét trực tiếp từ Web tab + fallback từ config.providers
+router.get('/models', async (req, res) => {
   const now = Math.floor(Date.now() / 1000);
-  const data = Object.values(config.providers).flatMap(p =>
-    p.models.map(id => ({
-      id,
+  if (req.query.refresh === 'true' && taskQueue.isBridgeReady()) {
+    await taskQueue.fetchWebModels({ openMenu: true });
+  }
+
+  const webAggregated = taskQueue.getAggregatedWebModels();
+  const seenIds = new Set();
+  const data = [];
+
+  // Ưu tiên danh sách model quét được từ tab trình duyệt thực tế
+  for (const wm of webAggregated.models) {
+    const key = String(wm.id).toLowerCase();
+    if (seenIds.has(key)) continue;
+    seenIds.add(key);
+    data.push({
+      id: wm.id,
+      name: wm.name,
+      description: wm.description || '',
       object: OPENAI.OBJECT_MODEL,
       created: now,
-      owned_by: `${p.id}-web-bridge`
-    }))
-  );
+      owned_by: `${wm.provider}-web-bridge`,
+      provider: wm.provider,
+      active: Boolean(wm.active),
+      source: 'web-live'
+    });
+  }
+
+  // Bổ sung danh sách fallback chuẩn từ config.providers (không trùng ID)
+  for (const p of Object.values(config.providers)) {
+    for (const id of p.models) {
+      const key = String(id).toLowerCase();
+      if (seenIds.has(key)) continue;
+      seenIds.add(key);
+      data.push({
+        id,
+        object: OPENAI.OBJECT_MODEL,
+        created: now,
+        owned_by: `${p.id}-web-bridge`,
+        provider: p.id,
+        source: 'config'
+      });
+    }
+  }
+
   res.json({ object: OPENAI.OBJECT_LIST, data });
 });
 

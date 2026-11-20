@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ChatGPT Bridge Console</title>
+  <title>Bridge Console</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
@@ -11,20 +11,20 @@
     <!-- Header -->
     <header class="header">
       <div class="logo-area">
-        <div class="logo-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 18 22 12 16 6"></polyline>
-            <polyline points="8 6 2 12 8 18"></polyline>
+        <div class="logo-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
           </svg>
         </div>
         <div>
           <h1 class="app-title">Bridge Console</h1>
-          <p class="app-subtitle">ChatGPT Web Live Monitor</p>
+          <p class="app-subtitle">Runtime Logs &amp; Live Monitor</p>
         </div>
       </div>
       <div class="header-actions">
-        <button id="btn-clear-logs" class="btn-icon" title="Xóa toàn bộ log">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-clear-logs" class="btn-icon" title="Xóa toàn bộ log" aria-label="Xóa toàn bộ log">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18"></path>
             <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
             <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
@@ -35,7 +35,7 @@
 
     <!-- Status Cards -->
     <div class="status-grid">
-      <div class="status-card">
+      <div class="status-card status-card-full">
         <div class="status-header">
           <span class="status-label">Local Server</span>
           <span id="badge-server" class="badge badge-loading">
@@ -67,41 +67,52 @@
     </div>
 
     <!-- Quick Action Bar -->
-    <div class="action-bar" style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button id="btn-reconnect" class="btn btn-secondary" style="flex: 1;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+    <div class="action-bar">
+      <button id="btn-reconnect" class="btn btn-secondary">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2v6h-6"></path>
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+          <path d="M3 22v-6h6"></path>
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
         </svg>
-        Nối lại
+        <span>Nối lại</span>
       </button>
-      <button id="btn-open-chatgpt" class="btn btn-secondary" style="flex: 1;">
-        ChatGPT
+      <button id="btn-open-chatgpt" class="btn btn-secondary">
+        <span>ChatGPT</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="7" y1="17" x2="17" y2="7"></line>
+          <polyline points="7 7 17 7 17 17"></polyline>
+        </svg>
       </button>
-      <button id="btn-open-gemini" class="btn btn-secondary" style="flex: 1;">
-        Gemini
+      <button id="btn-open-gemini" class="btn btn-secondary">
+        <span>Gemini</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="7" y1="17" x2="17" y2="7"></line>
+          <polyline points="7 7 17 7 17 17"></polyline>
+        </svg>
       </button>
-      <button id="btn-test-prompt" class="btn btn-primary" style="flex: 1;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button id="btn-test-prompt" class="btn btn-primary">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
-        Hỏi Mẫu
+        <span>Hỏi mẫu</span>
       </button>
     </div>
 
     <!-- Interactive Test Box -->
     <div class="test-box">
-      <div class="test-input-row" style="display: flex; gap: 6px;">
-        <select id="test-provider-select" style="background: #1e293b; color: #38bdf8; border: 1px solid #334155; border-radius: 6px; padding: 6px 8px; font-size: 12px; outline: none;">
+      <div class="test-input-row">
+        <select id="test-provider-select" aria-label="Chọn Provider">
           <option value="chatgpt">ChatGPT</option>
           <option value="gemini">Gemini</option>
         </select>
-        <input type="text" id="test-custom-prompt" placeholder="Nhập câu hỏi test hoặc chọn bên dưới..." value="Giải thích ngắn gọn 2 dòng: Microservices là gì?" style="flex: 1;">
-        <button id="btn-run-custom-test" class="btn btn-primary" style="flex: 0 0 auto; padding: 6px 12px;">Gửi</button>
+        <input type="text" id="test-custom-prompt" placeholder="Nhập câu hỏi kiểm thử..." value="Giải thích ngắn gọn 2 dòng: Microservices là gì?">
+        <button id="btn-run-custom-test" class="btn btn-primary btn-send">Gửi</button>
       </div>
       <div class="test-preset-chips">
-        <span class="chip" data-prompt="Giải thích ngắn gọn 2 dòng: Microservices là gì?" data-newchat="true">⚡ Nhanh</span>
-        <span class="chip" data-prompt="Viết 1 hàm JavaScript kiểm tra chuỗi đối xứng (Palindrome)." data-newchat="true">💻 Code JS</span>
-        <span class="chip" data-prompt="Bạn có nhớ câu hỏi trước đó tôi vừa hỏi bạn là gì không?" data-newchat="false">💬 Nối tiếp (Context)</span>
+        <span class="chip" data-prompt="Giải thích ngắn gọn 2 dòng: Microservices là gì?" data-newchat="true">Khởi tạo nhanh</span>
+        <span class="chip" data-prompt="Viết 1 hàm JavaScript kiểm tra chuỗi đối xứng (Palindrome)." data-newchat="true">Viết hàm JS</span>
+        <span class="chip" data-prompt="Bạn có nhớ câu hỏi trước đó tôi vừa hỏi bạn là gì không?" data-newchat="false">Kiểm tra ngữ cảnh</span>
       </div>
     </div>
 

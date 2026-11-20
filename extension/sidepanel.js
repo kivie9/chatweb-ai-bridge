@@ -264,7 +264,7 @@ async function runCustomTest(promptText, newChat = true, provider = null) {
       })
     });
   } catch (err) {
-    console.error('[SidePanel Custom Test] Lỗi:', err.message);
+    console.log('[SidePanel Custom Test] Lỗi:', err.message);
   } finally {
     if (btnRunCustomTest) {
       btnRunCustomTest.disabled = false;

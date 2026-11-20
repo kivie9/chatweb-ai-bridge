@@ -27,6 +27,7 @@ const config = {
   },
   queue: {
     maxSize: parseInt(process.env.MAX_QUEUE_SIZE, 10) || 200,
+    maxHistorySize: parseInt(process.env.MAX_HISTORY_SIZE, 10) || 200,
     defaultTimeoutMs: parseInt(process.env.DEFAULT_TIMEOUT_MS, 10) || 60000, // 60s phòng ngừa treo tab lâu
     concurrency: 1
   },

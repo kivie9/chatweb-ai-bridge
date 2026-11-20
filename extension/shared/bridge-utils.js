@@ -145,6 +145,14 @@
    */
   async function writeImageToClipboard(fileOrDataUrl) {
     try {
+      if (typeof document !== 'undefined' && !document.hasFocus()) {
+        try { window.focus(); } catch (_) {}
+        await sleep(50);
+        if (!document.hasFocus()) {
+          return false;
+        }
+      }
+
       const file = typeof fileOrDataUrl === 'string' ? dataUrlToFile(fileOrDataUrl) : fileOrDataUrl;
       if (!file) return false;
 
@@ -228,13 +236,13 @@
     btn.title = badgeTitle;
 
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    wrapper.style.cssText = 'display:flex;align-items:center;gap:7px;';
 
     const dot = document.createElement('span');
-    dot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background:${dotColor};box-shadow:0 0 6px ${dotColor};`;
+    dot.style.cssText = `display:inline-block;width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0;`;
 
     const label = document.createElement('span');
-    label.style.fontWeight = '600';
+    label.style.fontWeight = '500';
     label.textContent = labelText;
 
     wrapper.appendChild(dot);
@@ -246,34 +254,34 @@
       bottom: 20px;
       right: 20px;
       z-index: 999999;
-      background: #0f172a;
-      color: #38bdf8;
-      border: 1px solid #334155;
-      border-radius: 20px;
-      padding: 6px 14px;
+      background: #111113;
+      color: #e4e4e7;
+      border: 1px solid #27272a;
+      border-radius: 9999px;
+      padding: 6px 12px;
       font-size: 12px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
       display: flex;
       align-items: center;
-      transition: all 0.2s ease;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
       user-select: none;
     `;
 
     btn.onmouseenter = () => {
       try {
-        btn.style.transform = 'translateY(-2px)';
-        btn.style.borderColor = '#38bdf8';
-        btn.style.boxShadow = '0 6px 20px rgba(56,189,248,0.25)';
+        btn.style.background = '#18181b';
+        btn.style.borderColor = '#52525b';
+        btn.style.boxShadow = '0 6px 16px rgba(0,0,0,0.55)';
       } catch (_) {}
     };
 
     btn.onmouseleave = () => {
       try {
-        btn.style.transform = 'translateY(0)';
-        btn.style.borderColor = '#334155';
-        btn.style.boxShadow = '0 4px 14px rgba(0,0,0,0.45)';
+        btn.style.background = '#111113';
+        btn.style.borderColor = '#27272a';
+        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.45)';
       } catch (_) {}
     };
 
@@ -281,9 +289,8 @@
       if (!isExtensionValid()) {
         label.textContent = 'Extension Reloaded - F5 Trang';
         dot.style.background = '#f59e0b';
-        dot.style.boxShadow = '0 0 6px #f59e0b';
         btn.style.borderColor = '#f59e0b';
-        btn.style.color = '#f59e0b';
+        btn.style.color = '#fbbf24';
         setTimeout(() => {
           window.location.reload();
         }, 250);
@@ -300,9 +307,8 @@
         if (label && dot) {
           label.textContent = 'Bridge cần F5';
           dot.style.background = '#f59e0b';
-          dot.style.boxShadow = '0 0 6px #f59e0b';
           btn.style.borderColor = '#f59e0b';
-          btn.style.color = '#f59e0b';
+          btn.style.color = '#fbbf24';
           btn.title = 'Extension vừa được nạp lại trong Chrome. Bấm vào đây để tải lại trang.';
         }
       }

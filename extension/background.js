@@ -345,6 +345,10 @@ const workerAccounts = {
   chatgpt: null,
   gemini: null
 };
+const workerModels = {
+  chatgpt: { currentModel: null, models: [], updatedAt: null },
+  gemini: { currentModel: null, models: [], updatedAt: null }
+};
 
 // Đọc thông tin accounts đã lưu trước đó
 chrome.storage.local.get(['bridge_worker_accounts']).then((data) => {
@@ -505,6 +509,7 @@ function scheduleSyncTabsToServer() {
         workerId: identity.workerId,
         workerName: identity.workerName,
         accounts: workerAccounts,
+        webModels: workerModels,
         providers: activeProviders,
         tabCounts: tabCounts
       });
@@ -562,6 +567,7 @@ async function initWebSocket() {
         workerId: identity.workerId,
         workerName: identity.workerName,
         accounts: workerAccounts,
+        webModels: workerModels,
         providers: activeProviders,
         tabCounts: tabCounts
       });
@@ -595,6 +601,54 @@ async function initWebSocket() {
         if (chrome.runtime && typeof chrome.runtime.reload === 'function') {
           chrome.runtime.reload();
         }
+        return;
+      }
+
+      if (msg.action === 'FETCH_WEB_MODELS') {
+        const targetProviders = msg.provider && PROVIDERS[msg.provider] ? [msg.provider] : ['chatgpt', 'gemini'];
+        const openMenu = Boolean(msg.openMenu);
+        (async () => {
+          for (const pKey of targetProviders) {
+            const prov = PROVIDERS[pKey];
+            try {
+              const tabs = await chrome.tabs.query({ url: prov.urlPatterns });
+              if (!tabs || tabs.length === 0) continue;
+              const targetTab = tabs.find(t => t.active) || tabs[0];
+              try {
+                await chrome.scripting.executeScript({
+                  target: { tabId: targetTab.id },
+                  files: ['shared/bridge-constants.js', 'shared/bridge-utils.js', prov.scriptFile]
+                });
+              } catch (_) {}
+
+              const res = await new Promise((resolve) => {
+                const timer = setTimeout(() => resolve(null), 5000);
+                chrome.tabs.sendMessage(targetTab.id, { action: 'GET_WEB_MODELS', openMenu }, (reply) => {
+                  clearTimeout(timer);
+                  if (chrome.runtime.lastError || !reply) {
+                    resolve(null);
+                  } else {
+                    resolve(reply);
+                  }
+                });
+              });
+              if (res) {
+                workerModels[pKey] = {
+                  currentModel: res.currentModel || workerModels[pKey].currentModel,
+                  models: Array.isArray(res.models) ? res.models : [],
+                  updatedAt: res.updatedAt || new Date().toISOString()
+                };
+              }
+            } catch (err) {
+              console.log(`ℹ️ [Bridge BG] Lỗi FETCH_WEB_MODELS (${pKey}):`, err.message);
+            }
+          }
+          safeSend({
+            action: 'WEB_MODELS_RESULT',
+            id: msg.id,
+            webModels: workerModels
+          });
+        })();
         return;
       }
 
@@ -655,10 +709,15 @@ async function initWebSocket() {
               await new Promise(r => setTimeout(r, 600));
             }
 
-            // Kích hoạt tab ngầm trong cửa sổ chứa nó (không cướp focus cửa sổ hệ điều hành)
+            // Kích hoạt cửa sổ (nếu có ảnh cần OS focus) và tab chứa AI
             try {
+              if (hasImages && activeTab.windowId) {
+                try {
+                  await chrome.windows.update(activeTab.windowId, { focused: true });
+                } catch (_) {}
+              }
               await chrome.tabs.update(activeTab.id, { active: true });
-              await new Promise(r => setTimeout(r, 200));
+              await new Promise(r => setTimeout(r, hasImages ? 300 : 200));
             } catch (e) {
               console.log('⚠️ [Bridge BG] Không thể kích hoạt tab ngầm:', e.message);
             }
@@ -835,6 +894,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  if (request.action === 'UPLOAD_IMAGES_MAIN_WORLD') {
+    const tabId = sender?.tab?.id;
+    const images = Array.isArray(request.images) ? request.images : [];
+    if (!tabId || images.length === 0) {
+      sendResponse({ ok: false, error: 'Missing tabId or images' });
+      return false;
+    }
+
+    chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: mainWorldGeminiImageUploader,
+      args: [images]
+    }).then((results) => {
+      const result = results && results[0] ? results[0].result : null;
+      sendResponse(result || { ok: false, error: 'No result returned from MAIN world' });
+    }).catch((err) => {
+      console.log('ℹ️ [Bridge BG] UPLOAD_IMAGES_MAIN_WORLD error:', err.message);
+      sendResponse({ ok: false, error: err.message });
+    });
+    return true;
+  }
+
   if (request.action === 'OPEN_SIDEPANEL') {
     if (chrome.sidePanel && typeof chrome.sidePanel.open === 'function') {
       const tabId = sender.tab ? sender.tab.id : undefined;
@@ -842,6 +924,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.sidePanel.open({ tabId, windowId }).catch(() => {
         if (windowId) chrome.sidePanel.open({ windowId }).catch(() => {});
       });
+    }
+    return false;
+  }
+
+  // Tiếp nhận danh sách Model thực tế vừa quét từ Content Script (ChatGPT / Gemini)
+  if (request.action === 'UPDATE_WEB_MODELS') {
+    const { provider, data } = request;
+    if (provider && data && workerModels[provider]) {
+      workerModels[provider] = {
+        currentModel: data.currentModel || workerModels[provider].currentModel,
+        models: Array.isArray(data.models) && data.models.length > 0 ? data.models : workerModels[provider].models,
+        updatedAt: data.updatedAt || new Date().toISOString()
+      };
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        Promise.all([checkActiveProviderTabs(), getOrCreateWorkerIdentity()]).then(([{ activeProviders, tabCounts }, identity]) => {
+          safeSend({
+            action: 'REGISTER_WORKER',
+            workerId: identity.workerId,
+            workerName: identity.workerName,
+            accounts: workerAccounts,
+            webModels: workerModels,
+            providers: activeProviders,
+            tabCounts
+          });
+        }).catch(() => {});
+      }
     }
     return false;
   }
@@ -865,6 +973,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           workerId: identity.workerId,
           workerName: identity.workerName,
           accounts: workerAccounts,
+          webModels: workerModels,
           providers: activeProviders,
           tabCounts: tabCounts
         });
@@ -1027,5 +1136,343 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.runtime.onStartup.addListener(() => {
   checkAndConnect();
 });
+
+/**
+ * Self-contained image uploader injected into the page MAIN world for Gemini.
+ * Runs directly in Angular's JS world so ClipboardEvent/DragEvent DataTransfer and
+ * detached <input type="file"> interceptions work without ISOLATED-world wrapper stripping.
+ * @param {string[]} images - Array of Base64 Data URLs
+ * @returns {Promise<{ ok: boolean, method?: string, error?: string, diagnostics?: string }>}
+ */
+async function mainWorldGeminiImageUploader(images) {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function dataUrlToFile(dataUrl, defaultName) {
+    try {
+      const parts = String(dataUrl).split(',');
+      if (parts.length < 2) return null;
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      const ext = (mime.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '') || 'png';
+      const filename = defaultName.includes('.') ? defaultName : `${defaultName}.${ext}`;
+      return new File([u8arr], filename, { type: mime });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    try {
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function hasPreview() {
+    const selectors = [
+      'uploader-preview-card',
+      'xap-deferred-uploader img',
+      '[data-test-id*="preview"]',
+      'div[class*="preview"] img',
+      '.file-preview-container img',
+      'div[class*="preview-card"]',
+      'div[class*="file-preview"]',
+      'img[src^="blob:"]',
+      'img[src^="data:image/"]'
+    ];
+    for (const sel of selectors) {
+      try {
+        const els = document.querySelectorAll(sel);
+        for (const el of els) {
+          if (el.closest('user-query') || el.closest('model-response')) continue;
+          if (!isVisible(el)) continue;
+          if (el.tagName === 'IMG' || el.children.length > 0 || el.querySelector('img, mat-progress-bar, mat-progress-spinner, mat-spinner')) {
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  function findFileInputs() {
+    const inputs = [];
+    function walk(node) {
+      if (!node) return;
+      if (node.querySelectorAll) {
+        try {
+          const list = node.querySelectorAll('input[type="file"]');
+          for (const item of list) inputs.push(item);
+        } catch (_) {}
+      }
+      if (node.shadowRoot) walk(node.shadowRoot);
+      const children = node.children || [];
+      for (const child of children) walk(child);
+    }
+    walk(document.body || document.documentElement);
+    return inputs;
+  }
+
+  const files = [];
+  for (let i = 0; i < images.length; i++) {
+    const f = dataUrlToFile(images[i], `gemini_image_${i + 1}.png`);
+    if (f) files.push(f);
+  }
+  if (files.length === 0) {
+    return { ok: false, error: 'Failed to decode images in MAIN world' };
+  }
+
+  const dt = new DataTransfer();
+  files.forEach((f) => dt.items.add(f));
+
+  const editorSelectors = [
+    'rich-textarea div.ql-editor[contenteditable="true"]',
+    'rich-textarea div[contenteditable="true"]',
+    'div.ql-editor[contenteditable="true"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'div[contenteditable="true"]'
+  ];
+  let editor = null;
+  for (const sel of editorSelectors) {
+    editor = document.querySelector(sel);
+    if (editor) break;
+  }
+  if (!editor) {
+    return { ok: false, error: 'Gemini editor not found in MAIN world' };
+  }
+
+  const targets = Array.from(new Set([
+    editor,
+    editor.closest('rich-textarea'),
+    editor.closest('input-area-v2'),
+    editor.closest('.input-area-container'),
+    editor.parentElement,
+    document.querySelector('rich-textarea'),
+    document.querySelector('input-area-v2'),
+    document.querySelector('input-area'),
+    document.querySelector('xap-deferred-uploader')
+  ].filter(Boolean)));
+
+  // Strategy 1: MAIN World ClipboardEvent('paste')
+  try { window.focus(); } catch (_) {}
+  try { editor.focus(); } catch (_) {}
+
+  for (const t of targets) {
+    try {
+      t.focus();
+      const pasteEvt = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clipboardData: dt
+      });
+      if (!pasteEvt.clipboardData || !pasteEvt.clipboardData.files || pasteEvt.clipboardData.files.length === 0) {
+        try {
+          Object.defineProperty(pasteEvt, 'clipboardData', {
+            value: dt,
+            writable: false,
+            enumerable: true,
+            configurable: true
+          });
+        } catch (_) {}
+      }
+      t.dispatchEvent(pasteEvt);
+    } catch (_) {}
+  }
+
+  await sleep(700);
+  if (hasPreview()) {
+    return { ok: true, method: 'main-paste' };
+  }
+
+  // Strategy 2: MAIN World Drag & Drop
+  const dropTargets = Array.from(new Set([
+    ...targets,
+    document.querySelector('chat-window')
+  ].filter(Boolean)));
+
+  for (const t of dropTargets) {
+    try {
+      for (const evtType of ['dragenter', 'dragover', 'drop']) {
+        const evt = new DragEvent(evtType, {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          dataTransfer: dt
+        });
+        if (!evt.dataTransfer || !evt.dataTransfer.files || evt.dataTransfer.files.length === 0) {
+          try {
+            Object.defineProperty(evt, 'dataTransfer', {
+              value: dt,
+              configurable: true
+            });
+          } catch (_) {}
+        }
+        t.dispatchEvent(evt);
+      }
+    } catch (_) {}
+  }
+
+  await sleep(700);
+  if (hasPreview()) {
+    return { ok: true, method: 'main-drop' };
+  }
+
+  // Strategy 3: MAIN World File Input + HTMLInputElement.prototype.click / document.createElement interception
+  const assignedInputs = new WeakSet();
+  function assignFilesToInput(input) {
+    if (!input || assignedInputs.has(input)) return false;
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files');
+      if (descriptor && descriptor.set) {
+        descriptor.set.call(input, dt.files);
+      } else {
+        input.files = dt.files;
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+      assignedInputs.add(input);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const existingInputs = findFileInputs();
+  if (existingInputs.length > 0) {
+    for (const inp of existingInputs) {
+      assignFilesToInput(inp);
+    }
+    await sleep(700);
+    if (hasPreview()) {
+      return { ok: true, method: 'main-existing-input' };
+    }
+  }
+
+  const interceptedInputs = [];
+  const createdInputs = [];
+  const origInputClick = HTMLInputElement.prototype.click;
+  const origCreateElement = document.createElement.bind(document);
+
+  document.createElement = function(tagName, options) {
+    const el = origCreateElement(tagName, options);
+    if (typeof tagName === 'string' && tagName.toLowerCase() === 'input') {
+      createdInputs.push(el);
+    }
+    return el;
+  };
+
+  HTMLInputElement.prototype.click = function(...args) {
+    if (this && this.type === 'file') {
+      interceptedInputs.push(this);
+      assignFilesToInput(this);
+      return;
+    }
+    return origInputClick.apply(this, args);
+  };
+
+  let diagnostics = '';
+  try {
+    const inputContainer = editor.closest('.input-area-container') || editor.closest('input-area-v2') || editor.closest('input-area') || document;
+    const isAddUploadBtn = (btn) => {
+      if (!isVisible(btn)) return false;
+      const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+      const tip = (btn.getAttribute('mattooltip') || btn.getAttribute('gemtooltip') || '').toLowerCase();
+      const testId = (btn.getAttribute('data-test-id') || '').toLowerCase();
+      const combined = `${aria} ${tip} ${testId}`;
+      if (combined.includes('tool') || combined.includes('công cụ') || combined.includes('mic') || combined.includes('voice') || combined.includes('send') || combined.includes('gửi')) {
+        return false;
+      }
+      if (testId.includes('upload') || testId.includes('file') || combined.includes('tải tệp') || combined.includes('upload') || combined.includes('add files') || combined.includes('open upload') || combined.includes('mở trình đơn tải')) {
+        return true;
+      }
+      if (aria.includes('thêm') || aria.includes('add')) {
+        return true;
+      }
+      const matIcon = btn.querySelector('mat-icon');
+      if (matIcon) {
+        const iconName = (matIcon.getAttribute('fonticon') || matIcon.getAttribute('data-mat-icon-name') || matIcon.textContent || '').trim().toLowerCase();
+        if (iconName === 'add' || iconName === 'add_circle' || iconName === 'attach_file' || iconName === 'add_photo_alternate') {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const containerBtns = Array.from(inputContainer.querySelectorAll('button, [role="button"], uploader-file-picker button, xap-deferred-uploader button'));
+    const addBtn = inputContainer.querySelector('[data-test-id*="upload" i], uploader-file-picker button, xap-deferred-uploader button') ||
+                   containerBtns.find(isAddUploadBtn) ||
+                   Array.from(document.querySelectorAll('button[aria-label*="upload" i], button[aria-label*="tải tệp" i], button[aria-label*="add files" i]')).find(isVisible);
+
+    if (addBtn) {
+      addBtn.click();
+      await sleep(500);
+
+      const overlayRoot = document.querySelector('.cdk-overlay-container') || document;
+      const uploadOption = overlayRoot.querySelector('[data-test-id="local-images-files-uploader-button"]') ||
+                           overlayRoot.querySelector('[data-test-id*="local" i][data-test-id*="upload" i]') ||
+                           overlayRoot.querySelector('xap-deferred-uploader button') ||
+                           Array.from(overlayRoot.querySelectorAll('[role="menuitem"], .mat-mdc-menu-item, button, div.item')).find((el) => {
+                             if (!isVisible(el)) return false;
+                             const text = (el.innerText || el.textContent || '').trim().toLowerCase();
+                             return text.includes('tải tệp') || text.includes('tải lên') || text.includes('upload') || text.includes('thiết bị') || text.includes('computer') || text.includes('hình ảnh');
+                           });
+
+      if (uploadOption) {
+        uploadOption.click();
+      } else {
+        diagnostics = 'Menu upload option not found in overlay';
+      }
+    } else {
+      diagnostics = 'Add/upload trigger button not found';
+    }
+
+    const waitStart = Date.now();
+    while (Date.now() - waitStart < 1500) {
+      const lateInputs = [
+        ...interceptedInputs,
+        ...createdInputs.filter((el) => el && el.type === 'file'),
+        ...findFileInputs()
+      ];
+      for (const inp of lateInputs) {
+        assignFilesToInput(inp);
+      }
+      if (hasPreview()) {
+        return { ok: true, method: 'main-file-interceptor' };
+      }
+      if (interceptedInputs.length > 0) {
+        await sleep(350);
+        if (hasPreview()) {
+          return { ok: true, method: 'main-file-interceptor' };
+        }
+      }
+      await sleep(150);
+    }
+
+    if (interceptedInputs.length > 0 || createdInputs.some((el) => el && el.type === 'file') || findFileInputs().length > 0) {
+      return { ok: true, method: 'main-file-input-assigned' };
+    }
+  } finally {
+    HTMLInputElement.prototype.click = origInputClick;
+    document.createElement = origCreateElement;
+  }
+
+  try {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+    editor.focus();
+  } catch (_) {}
+
+  return { ok: false, error: diagnostics || 'Unable to trigger Gemini image upload in MAIN world' };
+}
 
 checkAndConnect();

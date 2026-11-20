@@ -20,9 +20,14 @@ class TaskQueue extends EventEmitter {
   constructor(options = {}) {
     super();
     this.maxQueueSize = options.maxQueueSize || config.queue.maxSize;
+    this.maxHistorySize = options.maxHistorySize || config.queue.maxHistorySize || 200;
     this.defaultTimeoutMs = options.defaultTimeoutMs || config.queue.defaultTimeoutMs;
     
     this.queue = [];
+    /** @type {Array<Object>} Lịch sử các prompt gần nhất (Bounded Ring Buffer) */
+    this.history = [];
+    /** @type {Map<string, Object>} Đang chờ kết quả quét model từ các Worker */
+    this._pendingModelRequests = new Map();
     /**
      * Quản lý cụm trình duyệt (Worker Pool):
      * Map<workerId, {
@@ -67,6 +72,7 @@ class TaskQueue extends EventEmitter {
       existing.providers = info.providers || existing.providers;
       existing.accounts = info.accounts || existing.accounts || {};
       if (info.tabCounts) existing.tabCounts = info.tabCounts;
+      if (info.webModels) existing.webModels = info.webModels;
       existing.lastActiveAt = Date.now();
       console.log(`🔄 [Worker Pool] Cập nhật kết nối Worker: ${workerId} ("${existing.name}") | Tabs: ${JSON.stringify(existing.tabCounts || {})}`);
     } else {
@@ -77,6 +83,7 @@ class TaskQueue extends EventEmitter {
         providers: info.providers || [PROVIDERS.CHATGPT, PROVIDERS.GEMINI],
         accounts: info.accounts || {},
         tabCounts: info.tabCounts || null,
+        webModels: info.webModels || { chatgpt: null, gemini: null },
         activeTasks: new Map(),
         stats: { completed: 0, failed: 0, byProvider: { chatgpt: { completed: 0, failed: 0 }, gemini: { completed: 0, failed: 0 } } },
         connectedAt: Date.now(),
@@ -107,12 +114,24 @@ class TaskQueue extends EventEmitter {
       this._cleanupTaskListeners(task);
 
       if (task.signal && task.signal.aborted) {
+        this._updateHistoryRecord(task.id, {
+          status: 'cancelled',
+          error: 'Client aborted while worker disconnected',
+          completedAt: Date.now(),
+          durationMs: task.startedAt ? Date.now() - task.startedAt : 0
+        });
         task.reject(new TaskCancelledError('Client aborted while worker disconnected'));
       } else {
         console.log(`🔄 [Worker Pool] Failover: Đưa task ${task.id} (${provider.toUpperCase()}) trở lại đầu queue do Worker ngắt kết nối.`);
         task.newChat = true; // Chuyển sang trình duyệt khác nên reset chat mới
         task.workerId = null;
         task.workerName = null;
+        this._updateHistoryRecord(task.id, {
+          status: 'queued',
+          workerId: null,
+          workerName: null,
+          account: null
+        });
         this.queue.unshift(task);
       }
     }
@@ -212,6 +231,7 @@ class TaskQueue extends EventEmitter {
         signal.addEventListener('abort', task.abortListener, { once: true });
       }
 
+      this._recordHistory(task);
       this.queue.push(task);
       this.emit(QUEUE_EVENTS.TASK_ENQUEUED, { id: taskId, provider: task.provider, queueLength: this.queue.length });
       this.processNext();
@@ -230,6 +250,12 @@ class TaskQueue extends EventEmitter {
     if (queueIndex !== -1) {
       const [removedTask] = this.queue.splice(queueIndex, 1);
       this._cleanupTaskListeners(removedTask);
+      this._updateHistoryRecord(taskId, {
+        status: 'cancelled',
+        error: reason,
+        completedAt: Date.now(),
+        durationMs: 0
+      });
       this.metrics.totalCancelled++;
       this.emit(QUEUE_EVENTS.TASK_CANCELLED, { id: taskId, reason, wasRunning: false });
       removedTask.reject(new TaskCancelledError(reason));
@@ -243,6 +269,12 @@ class TaskQueue extends EventEmitter {
           clearTimeout(runningTask.timer);
           this._cleanupTaskListeners(runningTask);
           worker.activeTasks.delete(provider);
+          this._updateHistoryRecord(taskId, {
+            status: 'cancelled',
+            error: reason,
+            completedAt: Date.now(),
+            durationMs: runningTask.startedAt ? Date.now() - runningTask.startedAt : 0
+          });
           this.metrics.totalCancelled++;
           this.emit(QUEUE_EVENTS.TASK_CANCELLED, { id: taskId, reason, wasRunning: true, workerId: worker.id });
           runningTask.reject(new TaskCancelledError(`Task cancelled while running: ${reason}`));
@@ -280,6 +312,12 @@ class TaskQueue extends EventEmitter {
     while (this.queue.length > 0) {
       const task = this.queue.shift();
       this._cleanupTaskListeners(task);
+      this._updateHistoryRecord(task.id, {
+        status: 'cancelled',
+        error: reason,
+        completedAt: Date.now(),
+        durationMs: 0
+      });
       this.metrics.totalCancelled++;
       this.emit(QUEUE_EVENTS.TASK_CANCELLED, { id: task.id, reason, wasRunning: false });
       task.reject(new TaskCancelledError(reason));
@@ -291,6 +329,12 @@ class TaskQueue extends EventEmitter {
       for (const [provider, runningTask] of worker.activeTasks.entries()) {
         clearTimeout(runningTask.timer);
         this._cleanupTaskListeners(runningTask);
+        this._updateHistoryRecord(runningTask.id, {
+          status: 'cancelled',
+          error: reason,
+          completedAt: Date.now(),
+          durationMs: runningTask.startedAt ? Date.now() - runningTask.startedAt : 0
+        });
         this.metrics.totalCancelled++;
         this.emit(QUEUE_EVENTS.TASK_CANCELLED, { id: runningTask.id, reason, wasRunning: true, workerId: worker.id });
         runningTask.reject(new TaskCancelledError(`Task cancelled: ${reason}`));
@@ -390,6 +434,17 @@ class TaskQueue extends EventEmitter {
       const waitDuration = task.startedAt - task.enqueuedAt;
       this._recordWaitTime(waitDuration);
 
+      const accInfo = (chosenWorker.accounts && chosenWorker.accounts[provider]) || null;
+      const accDisplay = accInfo ? (accInfo.email || accInfo.name || null) : null;
+      this._updateHistoryRecord(task.id, {
+        status: 'running',
+        startedAt: new Date(task.startedAt).toISOString(),
+        waitMs: waitDuration,
+        workerId: chosenWorker.id,
+        workerName: chosenWorker.name,
+        account: accDisplay
+      });
+
       this.emit(QUEUE_EVENTS.TASK_STARTED, {
         id: task.id,
         provider: task.provider,
@@ -408,6 +463,12 @@ class TaskQueue extends EventEmitter {
           chosenWorker.stats.failed = (chosenWorker.stats.failed || 0) + 1;
           chosenWorker.activeTasks.delete(task.provider);
           this._cleanupTaskListeners(task);
+          this._updateHistoryRecord(task.id, {
+            status: 'timeout',
+            error: `Timeout (${task.timeout / 1000}s)`,
+            completedAt: Date.now(),
+            durationMs: Date.now() - task.startedAt
+          });
           this.emit(QUEUE_EVENTS.TASK_FAILED, { id: task.id, error: 'Timeout', provider: task.provider, workerId: chosenWorker.id });
 
           if (chosenWorker.ws && chosenWorker.ws.readyState === 1) {
@@ -443,6 +504,12 @@ class TaskQueue extends EventEmitter {
         chosenWorker.stats.failed = (chosenWorker.stats.failed || 0) + 1;
         chosenWorker.activeTasks.delete(task.provider);
         this._cleanupTaskListeners(task);
+        this._updateHistoryRecord(task.id, {
+          status: 'failed',
+          error: `WebSocket Send Error to ${chosenWorker.name}: ${err.message}`,
+          completedAt: Date.now(),
+          durationMs: Date.now() - task.startedAt
+        });
         this.emit(QUEUE_EVENTS.TASK_FAILED, { id: task.id, error: err.message, provider: task.provider, workerId: chosenWorker.id });
         task.reject(new BridgeError(`WebSocket Send Error to ${chosenWorker.name}: ${err.message}`, 503, 'WS_SEND_FAILED'));
         this.processNext();
@@ -478,6 +545,15 @@ class TaskQueue extends EventEmitter {
 
     // Luồng streaming tokens
     if (data.action === 'STREAM_CHUNK') {
+      const histRecord = this._findHistoryRecord(task.id);
+      if (histRecord) {
+        const nextAnswer = data.fullText !== undefined && data.fullText !== null
+          ? String(data.fullText)
+          : `${histRecord.answer || ''}${data.chunk || ''}`;
+        histRecord.answer = nextAnswer.slice(0, 50000);
+        histRecord.completionTokens = sessionManager.estimateTokens(histRecord.answer);
+        histRecord.totalTokens = histRecord.promptTokens + histRecord.completionTokens;
+      }
       if (typeof task.onChunk === 'function') {
         try {
           task.onChunk(data.chunk, data.fullText);
@@ -509,6 +585,17 @@ class TaskQueue extends EventEmitter {
     data.workerName = foundWorker.name;
 
     if (data.status === TASK_STATUS.SUCCESS) {
+      const finalAnswer = String(data.answer || '').slice(0, 50000);
+      const completionTokens = sessionManager.estimateTokens(finalAnswer);
+      this._updateHistoryRecord(task.id, {
+        status: 'completed',
+        answer: finalAnswer,
+        error: null,
+        completedAt: Date.now(),
+        durationMs: execDuration,
+        completionTokens,
+        totalTokens: sessionManager.estimateTokens(task.prompt) + completionTokens
+      });
       this.metrics.totalCompleted++;
       foundWorker.stats.completed = (foundWorker.stats.completed || 0) + 1;
       this.emit(QUEUE_EVENTS.TASK_COMPLETED, {
@@ -521,9 +608,15 @@ class TaskQueue extends EventEmitter {
       });
       task.resolve(data);
     } else {
+      const errMsg = data.error || 'Unknown error from browser tab';
+      this._updateHistoryRecord(task.id, {
+        status: 'failed',
+        error: errMsg,
+        completedAt: Date.now(),
+        durationMs: execDuration
+      });
       this.metrics.totalFailed++;
       foundWorker.stats.failed = (foundWorker.stats.failed || 0) + 1;
-      const errMsg = data.error || 'Unknown error from browser tab';
       this.emit(QUEUE_EVENTS.TASK_FAILED, { id: task.id, provider: task.provider, workerId: foundWorker.id, error: errMsg });
       task.reject(new BridgeError(errMsg, HTTP_STATUS.INTERNAL_SERVER_ERROR, 'BROWSER_TASK_FAILED'));
     }
@@ -543,6 +636,12 @@ class TaskQueue extends EventEmitter {
         clearTimeout(interrupted.timer);
         this.metrics.totalFailed++;
         this._cleanupTaskListeners(interrupted);
+        this._updateHistoryRecord(interrupted.id, {
+          status: 'failed',
+          error: 'Bridge Server disconnected while executing task.',
+          completedAt: Date.now(),
+          durationMs: interrupted.startedAt ? Date.now() - interrupted.startedAt : 0
+        });
         interrupted.reject(new BridgeError('Bridge Server disconnected while executing task.', HTTP_STATUS.SERVICE_UNAVAILABLE, 'BRIDGE_DISCONNECTED'));
       }
       worker.activeTasks.clear();
@@ -733,6 +832,294 @@ class TaskQueue extends EventEmitter {
       currentTaskRunningMs: primaryActive ? primaryActive.runningMs : 0,
       activeTasks: allActiveTasks,
       stats: { ...this.metrics }
+    };
+  }
+
+  /**
+   * Khởi tạo bản ghi lịch sử khi đưa tác vụ vào hàng đợi (Bounded Ring Buffer)
+   * @param {Object} task
+   */
+  _recordHistory(task) {
+    const promptText = String(task.prompt || '').slice(0, 20000);
+    const promptTokens = sessionManager.estimateTokens(promptText);
+    const imageCount = Array.isArray(task.images) ? task.images.length : 0;
+
+    const record = {
+      id: task.id,
+      prompt: promptText,
+      hasImages: imageCount > 0,
+      imageCount,
+      provider: task.provider,
+      sessionId: task.sessionId || null,
+      newChat: Boolean(task.newChat),
+      stream: Boolean(task.stream),
+      status: 'queued',
+      workerId: null,
+      workerName: null,
+      account: null,
+      answer: '',
+      error: null,
+      promptTokens,
+      completionTokens: 0,
+      totalTokens: promptTokens,
+      enqueuedAt: task.enqueuedAt,
+      createdAt: new Date(task.enqueuedAt).toISOString(),
+      startedAt: null,
+      completedAt: null,
+      waitMs: 0,
+      durationMs: 0
+    };
+
+    this.history.unshift(record);
+    if (this.history.length > this.maxHistorySize) {
+      this.history.pop();
+    }
+  }
+
+  /**
+   * Tìm kiếm bản ghi lịch sử theo Task ID
+   * @param {string} taskId
+   * @returns {Object|null}
+   */
+  _findHistoryRecord(taskId) {
+    if (!taskId) return null;
+    return this.history.find(item => item.id === taskId) || null;
+  }
+
+  /**
+   * Cập nhật trạng thái và kết quả cho bản ghi lịch sử
+   * @param {string} taskId
+   * @param {Object} updates
+   */
+  _updateHistoryRecord(taskId, updates = {}) {
+    const record = this._findHistoryRecord(taskId);
+    if (!record) return;
+
+    if (updates.completedAt && typeof updates.completedAt === 'number') {
+      updates.completedAt = new Date(updates.completedAt).toISOString();
+    }
+    Object.assign(record, updates);
+  }
+
+  /**
+   * Truy vấn danh sách lịch sử prompt kèm bộ lọc & thống kê tổng hợp
+   * @param {Object} [options={}]
+   */
+  getHistory({ provider = null, status = null, search = null, limit = 200 } = {}) {
+    let completed = 0;
+    let failed = 0;
+    let running = 0;
+    let totalTokens = 0;
+
+    for (const item of this.history) {
+      if (item.status === 'completed') completed++;
+      else if (item.status === 'failed' || item.status === 'timeout' || item.status === 'cancelled') failed++;
+      else if (item.status === 'running' || item.status === 'queued') running++;
+      totalTokens += item.totalTokens || 0;
+    }
+
+    const providerFilter = provider ? String(provider).toLowerCase().trim() : null;
+    const statusFilter = status ? String(status).toLowerCase().trim() : null;
+    const searchFilter = search ? String(search).toLowerCase().trim() : null;
+    const maxItems = Math.min(Math.max(parseInt(limit, 10) || this.maxHistorySize, 1), this.maxHistorySize);
+
+    const filtered = this.history.filter((item) => {
+      if (providerFilter && providerFilter !== 'all' && item.provider !== providerFilter) {
+        return false;
+      }
+
+      if (statusFilter && statusFilter !== 'all') {
+        if (statusFilter === 'running') {
+          if (item.status !== 'running' && item.status !== 'queued') return false;
+        } else if (statusFilter === 'failed') {
+          if (item.status !== 'failed' && item.status !== 'timeout') return false;
+        } else if (item.status !== statusFilter) {
+          return false;
+        }
+      }
+
+      if (searchFilter) {
+        const haystack = [
+          item.id,
+          item.prompt,
+          item.answer,
+          item.error,
+          item.sessionId,
+          item.workerName,
+          item.account
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(searchFilter)) return false;
+      }
+
+      return true;
+    });
+
+    return {
+      total: filtered.length,
+      summary: {
+        total: this.history.length,
+        completed,
+        failed,
+        running,
+        totalTokens
+      },
+      items: filtered.slice(0, maxItems)
+    };
+  }
+
+  /**
+   * Lấy chi tiết 1 bản ghi lịch sử theo ID
+   * @param {string} id
+   * @returns {Object|null}
+   */
+  getHistoryItem(id) {
+    return this._findHistoryRecord(id);
+  }
+
+  /**
+   * Xóa 1 bản ghi lịch sử theo ID
+   * @param {string} id
+   * @returns {boolean}
+   */
+  deleteHistoryItem(id) {
+    const idx = this.history.findIndex(item => item.id === id);
+    if (idx === -1) return false;
+    this.history.splice(idx, 1);
+    return true;
+  }
+
+  /**
+   * Dọn sạch lịch sử các prompt đã kết thúc (giữ lại tác vụ đang chạy/chờ)
+   * @returns {number}
+   */
+  clearHistory() {
+    const before = this.history.length;
+    this.history = this.history.filter(item => item.status === 'queued' || item.status === 'running');
+    return before - this.history.length;
+  }
+
+  /**
+   * Tiếp nhận danh sách Model thực tế trả về từ Worker Extension qua WebSocket
+   * @param {Object} data
+   * @param {string} workerId
+   */
+  handleWebModelsResult(data, workerId) {
+    const worker = this.workers.get(workerId);
+    if (worker && data && data.webModels) {
+      worker.webModels = data.webModels;
+    }
+
+    if (data && data.id && this._pendingModelRequests.has(data.id)) {
+      const pending = this._pendingModelRequests.get(data.id);
+      pending.respondedWorkers.add(workerId);
+      if (pending.respondedWorkers.size >= pending.expectedCount) {
+        clearTimeout(pending.timer);
+        this._pendingModelRequests.delete(data.id);
+        pending.resolve(this.getAggregatedWebModels());
+      }
+    }
+  }
+
+  /**
+   * Gửi lệnh yêu cầu toàn bộ Browser Worker đang kết nối quét danh sách model thực tế trên web
+   * @param {Object} [options={}]
+   * @returns {Promise<{ providers: Object, models: Array }>}
+   */
+  fetchWebModels({ provider = null, openMenu = true, timeoutMs = 8000 } = {}) {
+    const readyWorkers = Array.from(this.workers.values()).filter(w => w.ws && w.ws.readyState === 1);
+    if (readyWorkers.length === 0) {
+      return Promise.resolve(this.getAggregatedWebModels());
+    }
+
+    return new Promise((resolve) => {
+      const reqId = `models_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const timer = setTimeout(() => {
+        this._pendingModelRequests.delete(reqId);
+        resolve(this.getAggregatedWebModels());
+      }, timeoutMs);
+
+      const pending = {
+        expectedCount: readyWorkers.length,
+        respondedWorkers: new Set(),
+        timer,
+        resolve
+      };
+      this._pendingModelRequests.set(reqId, pending);
+
+      let sentCount = 0;
+      for (const w of readyWorkers) {
+        try {
+          w.ws.send(JSON.stringify({
+            action: 'FETCH_WEB_MODELS',
+            id: reqId,
+            provider,
+            openMenu
+          }));
+          sentCount++;
+        } catch (_) {}
+      }
+
+      if (sentCount === 0) {
+        clearTimeout(timer);
+        this._pendingModelRequests.delete(reqId);
+        resolve(this.getAggregatedWebModels());
+      } else {
+        pending.expectedCount = sentCount;
+      }
+    });
+  }
+
+  /**
+   * Tổng hợp danh sách model thực tế đã phát hiện trên tất cả các tab trình duyệt
+   * @returns {{ providers: { chatgpt: Object, gemini: Object }, models: Array }}
+   */
+  getAggregatedWebModels() {
+    const providers = {
+      chatgpt: { currentModel: null, models: [], updatedAt: null },
+      gemini: { currentModel: null, models: [], updatedAt: null }
+    };
+    const allModels = [];
+    const seen = new Set();
+
+    for (const w of this.workers.values()) {
+      const wm = w.webModels || {};
+      for (const pKey of [PROVIDERS.CHATGPT, PROVIDERS.GEMINI]) {
+        const entry = wm[pKey];
+        if (!entry) continue;
+
+        if (entry.currentModel && !providers[pKey].currentModel) {
+          providers[pKey].currentModel = entry.currentModel;
+        }
+        if (entry.updatedAt && (!providers[pKey].updatedAt || entry.updatedAt > providers[pKey].updatedAt)) {
+          providers[pKey].updatedAt = entry.updatedAt;
+        }
+
+        const list = Array.isArray(entry.models) ? entry.models : [];
+        for (const m of list) {
+          if (!m || !m.id) continue;
+          const dedupeKey = `${pKey}:${String(m.id).toLowerCase()}`;
+          if (seen.has(dedupeKey)) continue;
+          seen.add(dedupeKey);
+
+          const modelObj = {
+            id: String(m.id),
+            name: m.name || String(m.id),
+            description: m.description || '',
+            provider: pKey,
+            active: Boolean(m.active),
+            source: 'web-live',
+            workerId: w.id,
+            workerName: w.name
+          };
+          providers[pKey].models.push(modelObj);
+          allModels.push(modelObj);
+        }
+      }
+    }
+
+    return {
+      providers,
+      models: allModels
     };
   }
 }

@@ -16,7 +16,7 @@
   });
 
   // Tránh nạp đè nếu script cùng version vẫn còn sống; nếu version mới hơn hoặc script cũ chết thì cho phép nạp mới
-  const SCRIPT_VERSION = '1.3.0';
+  const SCRIPT_VERSION = '1.7.0';
   if (window.__GEMINI_BRIDGE_LOADED__ && window.__GEMINI_BRIDGE_VERSION__ === SCRIPT_VERSION && window.__GEMINI_BRIDGE_IS_ALIVE__ && window.__GEMINI_BRIDGE_IS_ALIVE__()) {
     console.log('ℹ️ [Gemini Bridge] Content Script cùng phiên bản đã tồn tại, bỏ qua injection trùng lặp.');
     return;
@@ -25,7 +25,7 @@
   window.__GEMINI_BRIDGE_VERSION__ = SCRIPT_VERSION;
   window.__GEMINI_BRIDGE_IS_ALIVE__ = isExtensionValid;
 
-  console.log('🚀 [Gemini Bridge v1.3] Content Script nạp thành công trên tab Google Gemini.');
+  console.log('🚀 [Gemini Bridge v1.7] Content Script nạp thành công trên tab Google Gemini.');
 
   // Wrapper gửi tin an toàn tuyệt đối, không bao giờ ném Uncaught Error khi extension reload
   const safeSendMessage = UTILS.safeSendMessage || ((message) => {
@@ -310,7 +310,7 @@
 
   const sleep = UTILS.sleep || ((ms) => new Promise(r => setTimeout(r, ms)));
 
-  // Bóc tách text và bảo tồn Code Blocks trong câu trả lời của Gemini
+  // Bóc tách text, bảo tồn Code Blocks và Hình ảnh phản hồi trong câu trả lời của Gemini
   // Tuân thủ nghiêm ngặt TrustedHTML của Google (dùng TextNode thay vì outerHTML/innerHTML)
   function extractGeminiMarkdown(container) {
     if (!container) return '';
@@ -322,12 +322,50 @@
     // Lấy nội dung trực tiếp từ live DOM element trước (chuẩn TrustedHTML và không bị mất trên detached clone)
     const raw = (contentRoot.innerText || contentRoot.textContent || '').trim();
 
-    // Nếu có code blocks, bóc tách cấu trúc markdown sạch
     const codeBlocks = contentRoot.querySelectorAll('code-block');
-    if (codeBlocks.length > 0) {
+    const liveImgs = Array.from(contentRoot.querySelectorAll('img'));
+
+    if (codeBlocks.length > 0 || liveImgs.length > 0) {
       try {
+        const liveInfos = liveImgs.map((img) => {
+          try {
+            let src = (img.currentSrc || img.src || img.getAttribute('src') || '').trim();
+            if (!src || src.startsWith('chrome-extension://')) return { isContent: false };
+            const lowerSrc = src.toLowerCase();
+            if (lowerSrc.includes('google.com/s2/favicons') || lowerSrc.includes('favicons?domain') || lowerSrc.includes('favicon.ico')) {
+              return { isContent: false };
+            }
+            const attrW = parseInt(img.getAttribute('width') || '0', 10);
+            const attrH = parseInt(img.getAttribute('height') || '0', 10);
+            if ((attrW > 0 && attrW <= 36) || (attrH > 0 && attrH <= 36)) return { isContent: false };
+            const rect = img.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0 && rect.width <= 36 && rect.height <= 36) return { isContent: false };
+            const alt = (img.getAttribute('alt') || 'Image').replace(/[\r\n\[\]]+/g, ' ').trim() || 'Image';
+            return { isContent: true, src, alt };
+          } catch (_) {
+            return { isContent: false };
+          }
+        });
+
         const clone = contentRoot.cloneNode(true);
+        const cloneImgs = Array.from(clone.querySelectorAll('img'));
+        const seenUrls = new Set();
+
+        for (let i = 0; i < cloneImgs.length; i++) {
+          const cImg = cloneImgs[i];
+          const info = liveInfos[i];
+          if (info && info.isContent && !seenUrls.has(info.src)) {
+            seenUrls.add(info.src);
+            const parentBtn = cImg.closest('button, gem-icon-button');
+            if (parentBtn) parentBtn.setAttribute('data-bridge-keep', '1');
+            cImg.replaceWith(document.createTextNode(`\n![${info.alt}](${info.src})\n`));
+          } else {
+            cImg.remove();
+          }
+        }
+
         clone.querySelectorAll('h6, [aria-label*="Gemini said"], button, gem-icon-button, .code-block-decoration .buttons').forEach(el => {
+          if (el.hasAttribute('data-bridge-keep') || el.querySelector('[data-bridge-keep]')) return;
           try { el.remove(); } catch (_) { /* Node đã bị detach khỏi DOM — an toàn bỏ qua */ }
         });
         clone.querySelectorAll('code-block').forEach((block) => {
@@ -342,7 +380,7 @@
             /* Bỏ qua nếu block code có cấu trúc dị thường */
           }
         });
-        const formatted = (clone.innerText || clone.textContent || '').trim();
+        const formatted = (clone.innerText || clone.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
         if (formatted.length > 0) return formatted;
       } catch (_) {
         // Fallback về raw text nếu cloneNode gặp sự cố
@@ -837,22 +875,43 @@
       return inputs;
     }
 
-    // Kiểm tra xem Gemini đã hiển thị preview ảnh được tải lên chưa
+    // Kiểm tra xem Gemini đã hiển thị preview ảnh được tải lên trong khung nhập liệu chưa
     function hasGeminiUploadedPreview() {
       const selectors = [
         'uploader-preview-card',
+        'xap-deferred-uploader img',
         '[data-test-id*="preview"]',
+        'div[class*="preview"] img',
+        '.file-preview-container img',
         'div[class*="preview-card"]',
         'div[class*="attachment"]',
         'div[class*="file-preview"]',
-        'img[src*="blob:"]',
+        'img[src^="blob:"]',
+        'img[src^="data:image/"]',
         '.attachment-container'
       ];
       for (const sel of selectors) {
         try {
           const els = document.querySelectorAll(sel);
-          if (els && els.length > 0) return true;
+          for (const el of els) {
+            if (el.closest('user-query') || el.closest('model-response')) continue;
+            if (!isElementVisible(el)) continue;
+            if (el.tagName === 'IMG' || el.children.length > 0 || el.querySelector('img, mat-progress-bar, mat-progress-spinner, mat-spinner')) {
+              return true;
+            }
+          }
         } catch (e) {}
+      }
+      return false;
+    }
+
+    // Kiểm tra xem ảnh đính kèm trong vùng nhập liệu có đang upload spinner hay không
+    function isGeminiImageUploading() {
+      const inputArea = document.querySelector('input-area-v2, input-area, .input-area-container, uploader-preview-card, xap-deferred-uploader');
+      if (!inputArea) return false;
+      const spinners = inputArea.querySelectorAll('mat-progress-spinner, mat-spinner, mat-progress-bar, [role="progressbar"]');
+      for (const sp of spinners) {
+        if (isElementVisible(sp)) return true;
       }
       return false;
     }
@@ -860,23 +919,46 @@
     // Chờ hình ảnh upload xong trên Gemini
     async function waitForGeminiImageUpload(maxWaitMs = 15000) {
       const startTime = Date.now();
-      reportProgress('⏳ Đang đợi hình ảnh tải lên máy chủ Google Gemini...');
+      reportProgress('Đang đợi hình ảnh tải lên máy chủ Google Gemini...');
       while (Date.now() - startTime < maxWaitMs) {
         if (hasGeminiUploadedPreview()) {
-          await sleep(2000); // Đợi thanh progress bar của Gemini xử lý xong hoàn toàn
-          reportProgress('✅ Hình ảnh đã tải lên Google Gemini thành công!');
+          // Chờ spinner upload hoàn tất nếu có (tối đa 8 giây)
+          const spinStart = Date.now();
+          while (isGeminiImageUploading() && (Date.now() - spinStart < 8000)) {
+            await sleep(300);
+          }
+          await sleep(600);
+          reportProgress('Hình ảnh đã tải lên Google Gemini thành công!');
           return true;
         }
         await sleep(350);
       }
-      reportProgress('⚠️ Hết thời gian chờ preview ảnh Gemini, tiếp tục gửi câu hỏi...');
+      reportProgress('Hết thời gian chờ preview ảnh Gemini, tiếp tục gửi câu hỏi...');
       return false;
     }
 
-    // Nạp hình ảnh vào Gemini Web (Kết hợp 3 chiến lược: Paste Event, Drag & Drop, và File Input)
+    // Nạp hình ảnh vào Gemini Web (Ưu tiên thực thi trực tiếp trong MAIN World qua Background, fallback cục bộ nếu cần)
     async function uploadImagesToGemini(editor, images) {
       if (!Array.isArray(images) || images.length === 0) return;
-      reportProgress(`🖼️ Đang nạp ${images.length} hình ảnh vào Google Gemini...`);
+      reportProgress(`Đang nạp ${images.length} hình ảnh vào Google Gemini...`);
+
+      // CHIẾN LƯỢC CHÍNH: Thực thi trực tiếp trong MAIN World để không bị mất DataTransfer qua ranh giới ISOLATED World
+      try {
+        const mainRes = await safeSendMessage({
+          action: 'UPLOAD_IMAGES_MAIN_WORLD',
+          images
+        });
+        if (mainRes && mainRes.ok) {
+          reportProgress(`Nạp ảnh thành công qua MAIN World (${mainRes.method || 'auto'}).`);
+          await waitForGeminiImageUpload();
+          return;
+        }
+        if (mainRes && mainRes.error) {
+          reportProgress(`MAIN World notice: ${mainRes.error}, chuyển sang fallback cục bộ...`);
+        }
+      } catch (mainErr) {
+        reportProgress(`MAIN World bridge notice: ${mainErr.message}`);
+      }
 
       const files = [];
       for (let i = 0; i < images.length; i++) {
@@ -885,58 +967,29 @@
       }
 
       if (files.length === 0) {
-        reportProgress('❌ Không thể phân giải file ảnh từ Data URL.');
+        reportProgress('Không thể phân giải file ảnh từ Data URL.');
         return;
       }
 
       const dt = new DataTransfer();
       files.forEach(f => dt.items.add(f));
 
-      const targets = [
+      const targets = Array.from(new Set([
         editor,
         editor.closest('rich-textarea'),
+        editor.closest('input-area-v2'),
+        editor.closest('.input-area-container'),
         editor.parentElement,
         document.querySelector('rich-textarea'),
-        document.querySelector('input-area')
-      ].filter(Boolean);
+        document.querySelector('input-area-v2'),
+        document.querySelector('input-area'),
+        document.querySelector('xap-deferred-uploader')
+      ].filter(Boolean)));
 
-      // CHIẾN LƯỢC 1: Ghi ảnh vào System Clipboard và kích hoạt Paste
-      reportProgress('1. Ghi ảnh vào System Clipboard & kích hoạt Paste...');
-      try {
-        const firstImg = images[0];
-        const res = await fetch(firstImg);
-        const blob = await res.blob();
-        let pngBlob = blob;
-        if (blob.type !== 'image/png') {
-          pngBlob = await new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.naturalWidth || img.width;
-              canvas.height = img.naturalHeight || img.height;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0);
-              canvas.toBlob(resolve, 'image/png');
-            };
-            img.onerror = () => resolve(blob);
-            img.src = firstImg;
-          });
-        }
-        if (navigator.clipboard && navigator.clipboard.write) {
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': pngBlob })
-          ]);
-          reportProgress('📋 Đã nạp ảnh vào System Clipboard của OS!');
-        }
-      } catch (clipErr) {
-        reportProgress(`⚠️ Ghi clipboard: ${clipErr.message}`);
-      }
-
-      // Kích hoạt Paste trên editor
-      try {
-        editor.focus();
-        document.execCommand('paste');
-      } catch (_) {}
+      // FALLBACK 1: Synthetic ClipboardEvent('paste')
+      reportProgress('1. Fallback: Nạp ảnh qua ClipboardEvent paste...');
+      try { window.focus(); } catch (_) {}
+      try { editor.focus(); } catch (_) {}
 
       for (const t of targets) {
         try {
@@ -944,127 +997,112 @@
           const pasteEvt = new ClipboardEvent('paste', {
             bubbles: true,
             cancelable: true,
-            composed: true
+            composed: true,
+            clipboardData: dt
           });
-          Object.defineProperty(pasteEvt, 'clipboardData', {
-            value: dt,
-            writable: false,
-            enumerable: true,
-            configurable: true
-          });
+          if (!pasteEvt.clipboardData || !pasteEvt.clipboardData.files || pasteEvt.clipboardData.files.length === 0) {
+            try {
+              Object.defineProperty(pasteEvt, 'clipboardData', {
+                value: dt,
+                writable: false,
+                enumerable: true,
+                configurable: true
+              });
+            } catch (_) {}
+          }
           t.dispatchEvent(pasteEvt);
         } catch (e) {}
       }
 
-      await sleep(800);
+      await sleep(700);
       if (hasGeminiUploadedPreview()) {
         await waitForGeminiImageUpload();
         return;
       }
 
-      // CHIẾN LƯỢC 2: Drag & Drop Event (dragenter -> dragover -> drop)
-      reportProgress('2. Thử gửi ảnh qua Drag & Drop Event...');
+      // FALLBACK 2: Drag & Drop Event
+      reportProgress('2. Fallback: Thử nạp ảnh qua Drag & Drop Event...');
       for (const t of targets) {
         try {
-          const opts = { bubbles: true, cancelable: true, composed: true };
-
-          const enterEvt = new DragEvent('dragenter', opts);
-          Object.defineProperty(enterEvt, 'dataTransfer', { value: dt, configurable: true });
-          t.dispatchEvent(enterEvt);
-
-          const overEvt = new DragEvent('dragover', opts);
-          Object.defineProperty(overEvt, 'dataTransfer', { value: dt, configurable: true });
-          t.dispatchEvent(overEvt);
-
-          const dropEvt = new DragEvent('drop', opts);
-          Object.defineProperty(dropEvt, 'dataTransfer', { value: dt, configurable: true });
-          t.dispatchEvent(dropEvt);
+          const opts = { bubbles: true, cancelable: true, composed: true, dataTransfer: dt };
+          for (const evtType of ['dragenter', 'dragover', 'drop']) {
+            const evt = new DragEvent(evtType, opts);
+            if (!evt.dataTransfer || !evt.dataTransfer.files || evt.dataTransfer.files.length === 0) {
+              try {
+                Object.defineProperty(evt, 'dataTransfer', { value: dt, configurable: true });
+              } catch (_) {}
+            }
+            t.dispatchEvent(evt);
+          }
         } catch (e) {}
       }
 
-      await sleep(800);
+      await sleep(700);
       if (hasGeminiUploadedPreview()) {
         await waitForGeminiImageUpload();
         return;
       }
 
-      // CHIẾN LƯỢC 3: Quét tìm input[type="file"] và các nút Upload trong DOM & Shadow DOM
-      reportProgress('3. Quét input[type="file"] và nút đính kèm trong DOM & Shadow DOM...');
-      let fileInputs = findAllGeminiFileInputs();
+      // FALLBACK 3: Ghi System Clipboard + execCommand('paste') khi document thực sự focus
+      try {
+        window.focus();
+        editor.focus();
+      } catch (_) {}
+      await sleep(150);
 
-      // Log chẩn đoán các input hiện có trong document
-      const allInputs = Array.from(document.querySelectorAll('input')).map(inp => `${inp.type || 'text'}[name="${inp.name || ''}", id="${inp.id || ''}"]`);
-      reportProgress(`Các input hiện có: [${allInputs.slice(0, 10).join(', ')}]`);
-
-      // Quét các nút bấm xung quanh ô nhập liệu
-      const inputContainer = editor.closest('.input-area-container') || editor.closest('input-area') || editor.parentElement?.parentElement || document;
-      const nearbyButtons = Array.from(inputContainer.querySelectorAll('button, [role="button"], gem-icon-button')).map(b => {
-        const aria = b.getAttribute('aria-label') || '';
-        const tip = b.getAttribute('mattooltip') || '';
-        const txt = (b.innerText || '').trim();
-        return `[aria="${aria}", tip="${tip}", text="${txt}"]`;
-      });
-      reportProgress(`Nút xung quanh ô nhập: ${nearbyButtons.slice(0, 8).join(', ')}`);
-
-      if (fileInputs.length === 0) {
-        // Tìm nút mở menu upload hoặc file picker
-        const addBtn = inputContainer.querySelector('button[aria-label*="Add" i], button[aria-label*="Thêm" i], button[aria-label*="Upload" i], button[aria-label*="Tải" i], button[aria-label*="Tools" i], button[aria-label*="Công cụ" i], uploader-file-picker button, button[mattooltip*="Upload" i], button[mattooltip*="Thêm" i]') ||
-                       document.querySelector('button[aria-label*="Add files" i], button[aria-label*="Thêm tệp" i], button[aria-label*="Upload" i], button[aria-label*="Tải tệp" i]');
-
-        if (addBtn) {
-          const btnLabel = addBtn.getAttribute('aria-label') || addBtn.getAttribute('mattooltip') || addBtn.innerText;
-          reportProgress(`Bấm nút kích hoạt picker: "${btnLabel}"...`);
-          addBtn.click();
-          await sleep(600);
-
-          // Quét menu item vừa bật lên
-          const menuEls = Array.from(document.querySelectorAll('[role="menuitem"], .mat-mdc-menu-item, button, div.item')).filter(el => {
-            const text = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return text.includes('upload') || text.includes('tải') || text.includes('computer') || text.includes('thiết bị') || text.includes('drive');
-          });
-          reportProgress(`Phát hiện menu items: [${menuEls.map(m => (m.innerText || '').trim()).slice(0, 5).join(' | ')}]`);
-
-          const uploadOption = menuEls.find(el => {
-            const text = (el.innerText || el.textContent || '').trim().toLowerCase();
-            return text.includes('upload from computer') || text.includes('tải lên từ thiết bị') || text.includes('tải tệp lên') || text.includes('tải ảnh') || text.includes('upload file');
-          });
-
-          if (uploadOption) {
-            reportProgress(`Bấm chọn: "${(uploadOption.innerText || '').trim()}"...`);
-            uploadOption.click();
-            await sleep(600);
+      if (document.hasFocus() && navigator.clipboard && navigator.clipboard.write) {
+        reportProgress('3. Fallback: Document đang focus, nạp ảnh qua OS System Clipboard...');
+        try {
+          const firstImg = images[0];
+          const res = await fetch(firstImg);
+          const blob = await res.blob();
+          let pngBlob = blob;
+          if (blob.type !== 'image/png') {
+            pngBlob = await new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(resolve, 'image/png');
+              };
+              img.onerror = () => resolve(blob);
+              img.src = firstImg;
+            });
           }
-
-          fileInputs = findAllGeminiFileInputs();
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob })
+          ]);
+          editor.focus();
+          document.execCommand('paste');
+          await sleep(700);
+          if (hasGeminiUploadedPreview()) {
+            await waitForGeminiImageUpload();
+            return;
+          }
+        } catch (clipErr) {
+          reportProgress(`Ghi OS clipboard không khả dụng (${clipErr.message}), chuyển sang File Input...`);
         }
       }
 
+      // FALLBACK 4: Quét trực tiếp input[type="file"] trong DOM & Shadow DOM
+      reportProgress('4. Fallback: Quét input[type="file"] trong DOM & Shadow DOM...');
+      const fileInputs = findAllGeminiFileInputs();
       if (fileInputs.length > 0) {
-        reportProgress(`🎯 Tìm thấy ${fileInputs.length} file input! Đang nạp files vào input...`);
         for (const input of fileInputs) {
           try {
-            // Nạp qua prototype descriptor để vượt qua Angular/Lit setter override
             const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files');
             if (descriptor && descriptor.set) {
               descriptor.set.call(input, dt.files);
             } else {
               input.files = dt.files;
             }
-
             input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
             input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-            reportProgress('Đã kích hoạt sự kiện change & input trên file input.');
-          } catch (e) {
-            reportProgress(`Lỗi nạp file vào input: ${e.message}`);
-          }
+          } catch (_) {}
         }
-      } else {
-        reportProgress('⚠️ Vẫn không tìm thấy file input nào sau khi kích hoạt picker.');
-        try {
-          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
-          await sleep(300);
-          editor.focus();
-        } catch (_) {}
       }
 
       await waitForGeminiImageUpload();
@@ -1112,8 +1150,20 @@
   const geminiMsgListener = (request, sender, sendResponse) => {
     if (request.action === 'PING' || request.action === 'CHECK_ACCOUNT') {
       reportGeminiAccount();
-      sendResponse({ action: 'PONG', provider: 'gemini', version: '1.0' });
+      sendResponse({ action: 'PONG', provider: 'gemini', version: SCRIPT_VERSION });
       return false;
+    }
+
+    if (request.action === 'GET_WEB_MODELS') {
+      detectGeminiWebModels({ openMenu: Boolean(request.openMenu) })
+        .then((result) => {
+          safeSendMessage({ action: 'UPDATE_WEB_MODELS', provider: 'gemini', data: result });
+          try { sendResponse(result); } catch (_) {}
+        })
+        .catch((err) => {
+          try { sendResponse({ provider: 'gemini', currentModel: null, models: [], error: err.message }); } catch (_) {}
+        });
+      return true;
     }
 
     // Nhận lệnh hủy từ server/background
@@ -1255,15 +1305,171 @@
     return false;
   }
 
+  // Quét danh sách Model thực tế từ giao diện Google Gemini Web
+  async function detectGeminiWebModels({ openMenu = false } = {}) {
+    const models = [];
+    const seen = new Set();
+    let currentModel = null;
+
+    const findTriggerButton = () => {
+      const prioritySelectors = [
+        '[data-test-id="bard-mode-menu-button"]',
+        'bard-mode-switcher button',
+        '[data-test-id*="mode-menu" i]',
+        '[data-test-id*="model-selector" i]'
+      ];
+      for (const sel of prioritySelectors) {
+        try {
+          const el = document.querySelector(sel);
+          if (el && isElementVisible(el)) return el;
+        } catch (_) {}
+      }
+
+      const pill = document.querySelector('.logo-pill-label-container');
+      if (pill) {
+        const btn = pill.closest('button, [role="button"]') || pill;
+        if (isElementVisible(btn)) return btn;
+      }
+
+      const keywords = ['2.5 flash', '2.5 pro', '2.0 flash', '1.5 pro', '1.5 flash', 'flash', 'pro', 'deep research', 'thinking', 'reasoning', 'personalization'];
+      const candidateBtns = Array.from(document.querySelectorAll('header button, top-bar-actions button, bard-mode-switcher button, input-area-v2 button, .input-area-container button, button[aria-haspopup="menu"]'));
+      for (const btn of candidateBtns) {
+        if (!isElementVisible(btn)) continue;
+        const text = (btn.innerText || btn.textContent || '').trim();
+        const aria = (btn.getAttribute('aria-label') || '').toLowerCase();
+        const lower = text.toLowerCase();
+        if (!text || text.length > 50) continue;
+        if (lower.includes('upgrade') || lower.includes('nâng cấp') || lower.includes('subscribe') || aria.includes('account') || aria.includes('tài khoản')) continue;
+        if (keywords.some((kw) => lower.includes(kw) || aria.includes(kw))) {
+          return btn;
+        }
+      }
+      return null;
+    };
+
+    const normalizeSlug = (title) => {
+      const slug = String(title || '').toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-|-$/g, '');
+      if (!slug) return '';
+      return slug.startsWith('gemini') ? slug : `gemini-${slug}`;
+    };
+
+    const triggerBtn = findTriggerButton();
+    if (triggerBtn) {
+      const lines = (triggerBtn.innerText || triggerBtn.textContent || '').split('\n').map(s => s.trim()).filter(Boolean);
+      const filteredLines = lines.filter(l => !/^(gemini|keyboard_arrow_down|arrow_drop_down|expand_more)$/i.test(l));
+      currentModel = filteredLines[0] || lines[0] || null;
+      if (currentModel && currentModel.toLowerCase() === 'gemini') {
+        currentModel = null;
+      }
+    }
+
+    if (openMenu && triggerBtn && !isExecuting) {
+      try {
+        triggerBtn.click();
+        await sleep(450);
+
+        const overlayRoot = document.querySelector('.cdk-overlay-container') || document;
+        const itemSelectors = [
+          '[role="menuitem"]',
+          '[role="menuitemradio"]',
+          '.mat-mdc-menu-item',
+          'button.bard-mode-list-button',
+          '[data-test-id*="mode" i]'
+        ];
+        const rawItems = [];
+        for (const sel of itemSelectors) {
+          try {
+            overlayRoot.querySelectorAll(sel).forEach(el => rawItems.push(el));
+          } catch (_) {}
+        }
+
+        for (const item of rawItems) {
+          if (!isElementVisible(item)) continue;
+          const titleEl = item.querySelector('.mode-title, .title, [class*="mode-title"], [class*="title"]');
+          const descEl = item.querySelector('.mode-desc, .subtitle, .description, [class*="desc"], [class*="subtitle"]');
+          const lines = (item.innerText || item.textContent || '')
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s && !/^(check|done|new|mới|upgrade|nâng cấp)$/i.test(s));
+
+          const title = (titleEl ? (titleEl.innerText || titleEl.textContent || '').trim() : '') || lines[0] || '';
+          if (!title || title.length > 60) continue;
+
+          const description = (descEl ? (descEl.innerText || descEl.textContent || '').trim() : '') || (lines.length > 1 ? lines.slice(1).join(' — ') : '');
+          const id = normalizeSlug(title);
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+
+          const hasCheckIcon = Boolean(item.querySelector('mat-icon[fonticon="check"], mat-icon[data-mat-icon-name="check"], [aria-label*="selected" i]'));
+          const isSelected = item.getAttribute('aria-checked') === 'true' ||
+                             item.classList.contains('is-selected') ||
+                             item.classList.contains('selected') ||
+                             hasCheckIcon ||
+                             (currentModel && title.toLowerCase() === currentModel.toLowerCase());
+
+          if (isSelected && !currentModel) {
+            currentModel = title;
+          }
+
+          models.push({
+            id,
+            name: title,
+            description,
+            active: Boolean(isSelected),
+            source: 'web-dom'
+          });
+        }
+      } catch (_) {} finally {
+        try {
+          const backdrop = document.querySelector('.cdk-overlay-backdrop');
+          if (backdrop) backdrop.click();
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+        } catch (_) {}
+      }
+    }
+
+    if (models.length === 0 && currentModel) {
+      const id = normalizeSlug(currentModel);
+      if (id) {
+        models.push({
+          id,
+          name: currentModel,
+          description: 'Active model on tab',
+          active: true,
+          source: 'web-trigger'
+        });
+      }
+    }
+
+    return {
+      provider: 'gemini',
+      currentModel,
+      models,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  function reportGeminiWebModels() {
+    detectGeminiWebModels({ openMenu: false }).then((res) => {
+      if (res && (res.currentModel || res.models.length > 0)) {
+        safeSendMessage({ action: 'UPDATE_WEB_MODELS', provider: 'gemini', data: res });
+      }
+    }).catch(() => {});
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       injectGeminiBadge();
       setTimeout(reportGeminiAccount, 1200);
       setTimeout(reportGeminiAccount, 4000);
+      setTimeout(reportGeminiWebModels, 1500);
+      setTimeout(reportGeminiWebModels, 4500);
     });
   } else {
     injectGeminiBadge();
     setTimeout(reportGeminiAccount, 1200);
     setTimeout(reportGeminiAccount, 4000);
+    setTimeout(reportGeminiWebModels, 1500);
+    setTimeout(reportGeminiWebModels, 4500);
   }
 })();
